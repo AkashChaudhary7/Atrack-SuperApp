@@ -3,23 +3,7 @@ import { getAuth } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import defaultFirebaseConfig from "../firebase-applet-config.json";
 
-// We support loading an override config from localStorage to support different accounts
-const getActiveConfig = () => {
-  try {
-    const saved = localStorage.getItem("atrack_custom_firebase_config");
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed.projectId && parsed.apiKey) {
-        return parsed;
-      }
-    }
-  } catch (e) {
-    console.error("Failed loading custom firebase config:", e);
-  }
-  return defaultFirebaseConfig;
-};
-
-const activeConfig = getActiveConfig();
+const activeConfig = defaultFirebaseConfig;
 
 // Initialize or retrieve app
 const app = getApps().length === 0 ? initializeApp(activeConfig) : getApp();
@@ -34,15 +18,10 @@ const firestoreSettings = typeof window !== "undefined" ? {
 export const db = initializeFirestore(app, firestoreSettings, activeConfig.firestoreDatabaseId || undefined);
 export const auth = getAuth(app);
 
-// Function to update the configuration at runtime dynamically
+// Function to update the configuration at runtime dynamically - locked down to default only
 export function updateFirebaseConfigAtRuntime(newConfig: typeof defaultFirebaseConfig | null) {
-  if (newConfig) {
-    localStorage.setItem("atrack_custom_firebase_config", JSON.stringify(newConfig));
-  } else {
-    localStorage.removeItem("atrack_custom_firebase_config");
-  }
-  // Hard reload to refresh the instance initialization
-  window.location.reload();
+  // Option removed to enforce security and default single workspace config
+  console.warn("Override configuration is disabled. Default project active.");
 }
 
 export enum OperationType {
