@@ -76,6 +76,10 @@ service cloud.firestore {
       match /personalIDs/{idRecordId} {
         allow read, write: if isOwner(userId);
       }
+
+      match /goals/{goalId} {
+        allow read, write: if isOwner(userId);
+      }
     }
   }
 }
