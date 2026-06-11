@@ -132,3 +132,24 @@ export interface PersonalID {
   nameOnID: string;
   notes?: string;
 }
+
+export interface Milestone {
+  id: string;
+  title: string;
+  isCompleted: boolean;
+}
+
+export interface Goal {
+  id: string;
+  userId?: string;
+  profileId?: string;
+  title: string;
+  category: "Financial" | "Skill Mastery" | "Other";
+  targetValue: number;
+  currentValue: number;
+  unit: string;
+  targetDate: string;
+  createdAt: string;
+  updatedAt: string;
+  milestones: Milestone[];
+}
