@@ -2,7 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { 
   Expense, Bill, Habit, IntimacyLog, JerkOffLog, Medicine, 
   WeightRecord, WorkoutLog, PlannerTask, StudyFocusSession, 
-  SecurePassword, SecureDocument, DailyInsight, UserState, PersonalID, AssetAccount
+  SecurePassword, SecureDocument, DailyInsight, UserState, PersonalID, AssetAccount,
+  Goal, Milestone
 } from "./types";
 import { db, auth, handleFirestoreError, OperationType, updateFirebaseConfigAtRuntime } from "./firebase";
 import { 
@@ -81,6 +82,11 @@ interface AppContextType {
   deleteAssetAccount: (id: string) => void;
   updateAssetBalance: (id: string, changeAmount: number) => void;
 
+  goals: Goal[];
+  addGoal: (goal: Omit<Goal, "id" | "createdAt" | "updatedAt">) => void;
+  updateGoal: (id: string, updates: Partial<Goal>) => void;
+  deleteGoal: (id: string) => void;
+
   insights: DailyInsight[];
   isLoadingInsights: boolean;
   fetchInsights: () => Promise<void>;
@@ -95,6 +101,8 @@ interface AppContextType {
   signOutFirebase: () => Promise<void>;
   updateConfig: (config: any | null) => void;
   activeConfigName: string;
+  googleAccessToken: string | null;
+  setGoogleAccessToken: (token: string | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -127,6 +135,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [documents, setDocuments] = useState<SecureDocument[]>([]);
   const [personalIDs, setPersonalIDs] = useState<PersonalID[]>([]);
   const [assetAccounts, setAssetAccounts] = useState<AssetAccount[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
 
   const [insights, setInsights] = useState<DailyInsight[]>([
     { title: "Financial Check-In", category: "Finance", detail: "Your Car Loan EMI is coming up in 7 days. Budget ₹480 securely." },
@@ -140,6 +149,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isInitialLoadDone, setIsInitialLoadDone] = useState(false);
+
+  // Google OAuth Drive Token
+  const [googleAccessToken, setGoogleAccessTokenState] = useState<string | null>(() => {
+    return typeof window !== "undefined" ? sessionStorage.getItem("atrack_google_oauth_token") : null;
+  });
+
+  const setGoogleAccessToken = (token: string | null) => {
+    setGoogleAccessTokenState(token);
+    if (token) {
+      sessionStorage.setItem("atrack_google_oauth_token", token);
+    } else {
+      sessionStorage.removeItem("atrack_google_oauth_token");
+    }
+  };
 
   const activeConfigName = localStorage.getItem("atrack_custom_firebase_config") ? "Custom User Account" : "Default App Partition";
 
@@ -226,6 +249,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         { id: "aa_loan", name: "Personal Loan to Amit", type: "fixed", category: "Loan Given", balance: 10000, updatedAt: new Date().toISOString().split("T")[0] }
       ]));
 
+      setGoals(getLocal("atrack_goals", []));
+
       setInsights(getLocal("atrack_insights", insights));
     }
   }, []);
@@ -291,6 +316,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!firebaseUser) localStorage.setItem("atrack_asset_accounts", JSON.stringify(assetAccounts));
   }, [assetAccounts, firebaseUser]);
 
+  useEffect(() => {
+    if (!firebaseUser) localStorage.setItem("atrack_goals", JSON.stringify(goals));
+  }, [goals, firebaseUser]);
+
   // Firebase auth state change listener and Firestore synchronization pulls
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -324,7 +353,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const [
             finExpenses, finBills, finHabits, finIntLogs, finJerkLogs,
             finMeds, finWeights, finWorkouts, finTasks, finStudies,
-            finPasses, finDocs, finPersonalIDs, finAssetAccounts
+            finPasses, finDocs, finPersonalIDs, finAssetAccounts, finGoals
           ] = await Promise.all([
             fetchSubcol("expenses"),
             fetchSubcol("bills"),
@@ -339,7 +368,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             fetchSubcol("passwords"),
             fetchSubcol("documents"),
             fetchSubcol("personalIDs"),
-            fetchSubcol("assetAccounts")
+            fetchSubcol("assetAccounts"),
+            fetchSubcol("goals")
           ]);
 
           // Set synced states
@@ -356,6 +386,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (finPasses.length > 0) setPasswords(finPasses as any);
           if (finDocs.length > 0) setDocuments(finDocs as any);
           if (finPersonalIDs.length > 0) setPersonalIDs(finPersonalIDs as any);
+          if (finGoals.length > 0) setGoals(finGoals as any);
 
           let resolvedAssetAccounts = finAssetAccounts;
           if (finAssetAccounts.length === 0) {
@@ -796,6 +827,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     removeFromFirestore("personalIDs", id);
   };
 
+  // Goals
+  const addGoal = (goalBase: Omit<Goal, "id" | "createdAt" | "updatedAt">) => {
+    const now = new Date().toISOString();
+    const newGoal: Goal = { 
+      ...goalBase, 
+      id: "goal_" + Date.now().toString(),
+      userId: firebaseUser ? firebaseUser.uid : undefined,
+      profileId: userState.currentProfile,
+      createdAt: now,
+      updatedAt: now
+    };
+    setGoals(prev => [newGoal, ...prev]);
+    saveToFirestore("goals", newGoal.id, newGoal);
+  };
+
+  const updateGoal = (id: string, updates: Partial<Goal>) => {
+    setGoals(prev => prev.map(g => {
+      if(g.id === id) {
+        const updated = { ...g, ...updates, updatedAt: new Date().toISOString() };
+        saveToFirestore("goals", id, updated);
+        return updated;
+      }
+      return g;
+    }));
+  };
+
+  const deleteGoal = (id: string) => {
+    setGoals(prev => prev.filter(g => g.id !== id));
+    removeFromFirestore("goals", id);
+  };
+
   // Fetch bespoke Insights from server using Gemini
   const fetchInsights = async () => {
     setIsLoadingInsights(true);
@@ -835,7 +897,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const payload = {
       expenses, bills, habits, intimacyLogs, jerkOffLogs, medicines,
       weightRecords, workouts, tasks, studySessions, passwords, documents,
-      personalIDs, assetAccounts, userState
+      personalIDs, assetAccounts, goals, userState
     };
     return btoa(JSON.stringify(payload));
   };
@@ -900,6 +962,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAssetAccounts(data.assetAccounts);
         data.assetAccounts.forEach((aa: any) => saveToFirestore("assetAccounts", aa.id, aa));
       }
+      if (data.goals) {
+        setGoals(data.goals);
+        data.goals.forEach((g: any) => saveToFirestore("goals", g.id, g));
+      }
       if (data.userState) {
         setUserState(prev => ({ ...prev, profiles: data.userState.profiles || prev.profiles }));
       }
@@ -913,8 +979,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Google Login and configuration handlers
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
+    provider.addScope('https://www.googleapis.com/auth/drive.file');
+    provider.addScope('https://www.googleapis.com/auth/drive');
     try {
       const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (credential?.accessToken) {
+        setGoogleAccessToken(credential.accessToken);
+      }
       return result.user;
     } catch (err) {
       console.error("Google sign-in error:", err);
@@ -926,6 +998,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await signOut(auth);
       setFirebaseUser(null);
+      setGoogleAccessToken(null);
     } catch (err) {
       console.error("Logout error:", err);
     }
@@ -952,10 +1025,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       documents, addDocument, deleteDocument,
       personalIDs, addPersonalID, deletePersonalID,
       assetAccounts, addAssetAccount, updateAssetAccount, deleteAssetAccount, updateAssetBalance,
+      goals, addGoal, updateGoal, deleteGoal,
       insights, isLoadingInsights, fetchInsights,
       exportData, importData,
       // Firebase properties
-      firebaseUser, isSyncing, signInWithGoogle, signOutFirebase, updateConfig, activeConfigName
+      firebaseUser, isSyncing, signInWithGoogle, signOutFirebase, updateConfig, activeConfigName,
+      googleAccessToken, setGoogleAccessToken
     }}>
       {children}
     </AppContext.Provider>
