@@ -1,0 +1,6 @@
+{
+  "name": "Atrack",
+  "description": "Mobile superapp for tracking finance, habits, intimate performance, medicine, workouts, and plans.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
