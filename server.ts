@@ -60,6 +60,44 @@ Respond with a JSON block conforming to the following structure:
   }
 });
 
+// Gemini Expense Chat Advisor Endpoint
+app.post("/api/chat/expenses", async (req, res) => {
+  try {
+    const { message, expenses, history } = req.body;
+    
+    // Format history for the Gemini API
+    const formattedHistory = [
+      {
+        role: "user",
+        parts: [{ text: `You are a financial advisor for Atrack. The user has the following recent expenses: ${JSON.stringify(expenses)}. Provide actionable advice on saving money, budgeting, and optimizing spending.` }]
+      },
+      {
+        role: "model",
+        parts: [{ text: "Understood. I will provide financial advice based on the user's spending habits." }]
+      },
+      ...(history || []).map((msg: any) => ({
+        role: msg.role === "user" ? "user" : "model",
+        parts: [{ text: msg.content }]
+      }))
+    ];
+
+    formattedHistory.push({
+      role: "user",
+      parts: [{ text: message }]
+    });
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: formattedHistory
+    });
+
+    res.json({ reply: response.text });
+  } catch (error) {
+    console.error("Gemini Chat Error:", error);
+    res.status(500).json({ error: "Failed to generate chat response" });
+  }
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
