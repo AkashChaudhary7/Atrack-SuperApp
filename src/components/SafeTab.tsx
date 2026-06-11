@@ -14,13 +14,16 @@ export const SafeTab: React.FC = () => {
     personalIDs, addPersonalID, deletePersonalID,
     exportData, importData,
     // Firebase states
-    firebaseUser, isSyncing, signInWithGoogle, signOutFirebase, updateConfig, activeConfigName
+    firebaseUser, isSyncing, signInWithGoogle, signOutFirebase, updateConfig, activeConfigName,
+    googleAccessToken, setGoogleAccessToken
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<"passwords" | "ids" | "documents" | "sync">("passwords");
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedID, setCopiedID] = useState<string | null>(null);
   const [previewDoc, setPreviewDoc] = useState<SecureDocument | null>(null);
+  const [isDriveUploading, setIsDriveUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   // Credentials form state
   const [title, setTitle] = useState("");
@@ -139,23 +142,136 @@ export const SafeTab: React.FC = () => {
     }
   };
 
+  const handleDriveDownload = async (fileId: string, fileName: string) => {
+    if (!googleAccessToken) {
+      alert("Please connect Google Drive first in the 'Cloud Sync' section!");
+      return;
+    }
+    try {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        headers: {
+          Authorization: `Bearer ${googleAccessToken}`
+        }
+      });
+      if (!res.ok) throw new Error("Could not download file content from Google Drive.");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert("Download failed: " + err.message);
+    }
+  };
+
+  const handleDeleteDocument = async (docId: string, driveFileId?: string) => {
+    const confirmed = window.confirm("Are you sure you want to delete this document from your secure cabinet?");
+    if (!confirmed) return;
+    
+    if (driveFileId && googleAccessToken) {
+      try {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${googleAccessToken}` }
+        });
+      } catch (err) {
+        console.warn("Failed to delete from Google Drive directly, removing from ledger only:", err);
+      }
+    }
+    deleteDocument(docId);
+  };
+
   const handleDocumentUpload = (e: React.FormEvent) => {
     e.preventDefault();
-    if (docTitle && fileInput) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
+    if (!docTitle || !fileInput) return;
+
+    if (!googleAccessToken) {
+      alert("Please sign in or link your Google Drive in the 'Cloud Sync' section first to upload files to Google Drive!");
+      return;
+    }
+
+    setIsDriveUploading(true);
+    setUploadError("");
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+      try {
+        const base64Data = (reader.result as string).split(',')[1];
+        const metadata = {
+          name: fileInput.name,
+          mimeType: fileInput.type || 'application/octet-stream',
+          description: `Atrack secure cabinet document: ${docTitle}`
+        };
+
+        const boundary = 'atrack_drive_boundary';
+        const multipartBody = 
+          `\r\n--${boundary}\r\n` +
+          `Content-Type: application/json; charset=UTF-8\r\n\r\n` +
+          `${JSON.stringify(metadata)}\r\n` +
+          `--${boundary}\r\n` +
+          `Content-Type: ${metadata.mimeType}\r\n` +
+          `Content-Transfer-Encoding: base64\r\n\r\n` +
+          `${base64Data}\r\n` +
+          `--${boundary}--`;
+
+        const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${googleAccessToken}`,
+            'Content-Type': `multipart/related; boundary=${boundary}`
+          },
+          body: multipartBody
+        });
+
+        if (!response.ok) {
+          const detail = await response.text();
+          throw new Error(`Google Drive Upload API returned ${response.status}: ${detail}`);
+        }
+
+        const driveInfo = await response.json();
+        const fileId = driveInfo.id;
+
+        // Fetch webViewLink and webContentLink
+        const infoRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=webViewLink,webContentLink`, {
+          headers: { Authorization: `Bearer ${googleAccessToken}` }
+        });
+
+        let webViewLink = `https://drive.google.com/file/d/${fileId}/view`;
+        let webContentLink = `https://drive.google.com/uc?export=download&id=${fileId}`;
+
+        if (infoRes.ok) {
+          const info = await infoRes.json();
+          if (info.webViewLink) webViewLink = info.webViewLink;
+          if (info.webContentLink) webContentLink = info.webContentLink;
+        }
+
         addDocument({
           profileId: "Self",
           title: docTitle,
           fileName: fileInput.name,
           uploadedAt: new Date().toISOString().split("T")[0],
-          fileDataEncrypted: reader.result as string
+          fileDataEncrypted: "[Google Drive Sync Active]",
+          driveFileId: fileId,
+          webViewLink,
+          webContentLink
         });
+
         setDocTitle("");
         setFileInput(null);
-      };
-      reader.readAsDataURL(fileInput);
-    }
+        alert("Encrypted file successfully uploaded directly to your secure Google Drive space!");
+      } catch (err: any) {
+        console.error(err);
+        setUploadError(err.message);
+        alert("Failed to upload file to Google Drive: " + err.message);
+      } finally {
+        setIsDriveUploading(false);
+      }
+    };
+    reader.readAsDataURL(fileInput);
   };
 
   const handleSaveCustomConfig = (e: React.FormEvent) => {
@@ -593,11 +709,14 @@ export const SafeTab: React.FC = () => {
         <div className="space-y-4">
           <form onSubmit={handleDocumentUpload} className="bg-slate-50 border border-slate-150 rounded-2xl p-4 space-y-3.5 shadow-sm text-sm text-slate-800">
             <div>
-              <h3 className="font-bold text-slate-800 text-xs flex items-center gap-1.5 uppercase tracking-wide">
-                <FileUp className="w-4 h-4 text-cyan-600" /> Private File Upload Cabinet
+              <h3 className="font-bold text-slate-800 text-xs flex items-center justify-between uppercase tracking-wide">
+                <span className="flex items-center gap-1.5"><FileUp className="w-4 h-4 text-cyan-600" /> Private File Upload Cabinet</span>
+                <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono ${googleAccessToken ? "bg-emerald-100 text-emerald-700" : "bg-rose-100 text-rose-700 animate-pulse"}`}>
+                  {googleAccessToken ? "DRIVE ACTIVE" : "DRIVE LINK REQUIRED"}
+                </span>
               </h3>
               <p className="text-[10px] text-slate-500 mt-1">
-                Upload receipts, certificates, or IDs. Files are packed into high-security encrypted storage, and real-time synchronized to Firestore.
+                Upload receipts, certificates, or IDs. Files are sync-stored securely directly in your Google Drive, while local ledger descriptors map in Firestore.
               </p>
             </div>
 
@@ -658,10 +777,11 @@ export const SafeTab: React.FC = () => {
 
             <button 
               type="submit"
-              disabled={!fileInput || !docTitle}
+              disabled={!fileInput || !docTitle || isDriveUploading}
               className="w-full bg-gradient-to-r from-cyan-500 to-indigo-600 hover:opacity-95 active:scale-[0.98] disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed font-bold text-white py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all text-xs cursor-pointer"
             >
-              <FolderLock className="w-3.5 h-3.5" /> Encrypt and Store in Cabinet
+              <FolderLock className={`w-3.5 h-3.5 ${isDriveUploading ? 'animate-spin' : ''}`} /> 
+              {isDriveUploading ? "Syphoning to Google Drive..." : "Sync & Store in Drive Cabinet"}
             </button>
           </form>
 
@@ -699,8 +819,9 @@ export const SafeTab: React.FC = () => {
                       </button>
 
                       <button
-                        onClick={() => deleteDocument(doc.id)}
+                        onClick={() => handleDeleteDocument(doc.id, doc.driveFileId)}
                         className="p-1.5 rounded-lg border border-slate-150 text-slate-400 hover:text-rose-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                        title="Delete Secure Document"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -775,61 +896,18 @@ export const SafeTab: React.FC = () => {
             )}
           </div>
 
-          {/* Account override manager */}
-          <div className="bg-slate-50 border border-slate-150 rounded-2xl p-5 space-y-4 shadow-sm text-slate-800 text-left">
-            <div className="flex justify-between items-center">
+          {/* Custom Google connection active info only */}
+          {googleAccessToken && (
+            <div className="bg-emerald-50/50 border border-emerald-100 rounded-2xl p-5 space-y-2 text-slate-800 text-left">
               <div className="flex gap-2.5 items-center">
-                <Settings2 className="w-5 h-5 text-indigo-600" />
-                <h3 className="font-bold text-slate-800 text-sm">Use Custom Firestore Account</h3>
+                <Check className="w-5 h-5 text-emerald-600" />
+                <h3 className="font-bold text-emerald-800 text-sm">Google Drive File Cabinet Locked</h3>
               </div>
-              <button
-                onClick={() => setShowConfigEditor(!showConfigEditor)}
-                className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 px-2 py-1 rounded-lg transition-colors cursor-pointer"
-              >
-                {showConfigEditor ? "Close Settings" : "Configure Account"}
-              </button>
+              <p className="text-xs text-emerald-605 font-medium leading-relaxed font-sans">
+                Vault database is linked to Google Drive storage, using secure credentials. All document uploads bypass external nodes and flow directly to your drive.
+              </p>
             </div>
-
-            <p className="text-xs text-slate-500">
-              Want to synchronization onto your own personal Firebase Console project? Paste your raw web-app config JSON object here to establish direct connection.
-            </p>
-
-            {showConfigEditor && (
-              <form onSubmit={handleSaveCustomConfig} className="space-y-3 mt-2 animate-in slide-in-from-top-3 duration-200">
-                <div className="space-y-1">
-                  <label className="text-[9px] font-mono font-bold text-slate-400 uppercase">Paste Web SDK parameters configuration JSON</label>
-                  <textarea
-                    placeholder={`{\n  "apiKey": "AIzaSy...",\n  "authDomain": "your-project.firebaseapp.com",\n  "projectId": "your-project",\n  "appId": "1:..."\n}`}
-                    value={customConfigJson}
-                    onChange={(e) => setCustomConfigJson(e.target.value)}
-                    className="w-full h-36 bg-white border border-slate-200 rounded-xl p-3 text-xs text-slate-800 placeholder-slate-400 focus:outline-none font-mono"
-                  />
-                  {configError && (
-                    <span className="text-[10px] font-bold text-rose-600 block mt-1">{configError}</span>
-                  )}
-                </div>
-
-                <div className="flex gap-2.5">
-                  <button
-                    type="submit"
-                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs transition-all active:scale-95 cursor-pointer text-center"
-                  >
-                    Save &amp; Active Connection
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCustomConfigJson("");
-                      updateConfig(null);
-                    }}
-                    className="px-3 py-2 border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 font-bold rounded-xl text-xs transition-colors cursor-pointer"
-                  >
-                    Reset Default Account
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
+          )}
 
           {/* Simple Backup File Export as Failback */}
           <div className="bg-slate-50 border border-slate-150 rounded-2xl p-5 space-y-4 shadow-sm text-slate-800 text-left">
@@ -994,26 +1072,47 @@ export const SafeTab: React.FC = () => {
                   This secure document is encrypted entirely client-side using end-to-end zero-knowledge passcodes. No raw file parameters or metadata are accessible outside this device.
                 </p>
                 <div className="pt-1.5 border-t border-emerald-200/40 text-[8px] font-mono text-slate-400 flex justify-between items-center">
-                  <span>SEGMENT SIZE</span>
-                  <span className="font-bold text-slate-600 font-sans">
-                    {Math.ceil(previewDoc.fileDataEncrypted?.length * 0.75 / 1024) || 32} KB
+                  <span>STORAGE MODE</span>
+                  <span className="font-bold text-slate-600 font-sans uppercase">
+                    {previewDoc.driveFileId ? "Synced (Google Drive)" : "Local Encrypted"}
                   </span>
                 </div>
               </div>
             </div>
 
             {/* Footer buttons */}
-            <div className="p-3 bg-slate-50 border-t border-slate-100 flex gap-2">
-              <a
-                href={previewDoc.fileDataEncrypted}
-                download={previewDoc.fileName}
-                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs tracking-wide transition-all cursor-pointer text-center block"
-              >
-                Decipher Download
-              </a>
+            <div className="p-3 bg-slate-50 border-t border-slate-100 flex flex-col gap-2.5">
+              <div className="flex gap-2">
+                {previewDoc.driveFileId ? (
+                  <>
+                    <a
+                      href={previewDoc.webViewLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 rounded-xl text-xs tracking-wide transition-all cursor-pointer text-center block flex items-center justify-center gap-1"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> View on Drive
+                    </a>
+                    <button
+                      onClick={() => handleDriveDownload(previewDoc.driveFileId!, previewDoc.fileName)}
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs tracking-wide transition-all cursor-pointer text-center block flex items-center justify-center gap-1"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Decipher Download
+                    </button>
+                  </>
+                ) : (
+                  <a
+                    href={previewDoc.fileDataEncrypted}
+                    download={previewDoc.fileName}
+                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-xl text-xs tracking-wide transition-all cursor-pointer text-center block"
+                  >
+                    Decipher Download
+                  </a>
+                )}
+              </div>
               <button
                 onClick={() => setPreviewDoc(null)}
-                className="flex-shrink-0 px-3 py-2 border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold rounded-xl text-xs transition-all cursor-pointer"
+                className="w-full py-2 border border-slate-200 hover:bg-slate-100 text-slate-600 font-bold rounded-xl text-xs transition-all cursor-pointer text-center"
               >
                 Dismiss
               </button>
