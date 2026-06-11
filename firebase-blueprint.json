@@ -224,6 +224,26 @@
         "notes": { "type": "string" }
       },
       "required": ["id", "userId", "profileId", "idType", "idNumber", "nameOnID"]
+    },
+    "Goal": {
+      "title": "Goal",
+      "description": "Milestones and targets tracker for long-term objectives",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "profileId": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string", "enum": ["Financial", "Skill Mastery", "Other"] },
+        "targetValue": { "type": "number" },
+        "currentValue": { "type": "number" },
+        "unit": { "type": "string" },
+        "targetDate": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "milestones": { "type": "array" }
+      },
+      "required": ["id", "userId", "profileId", "title", "category", "targetValue", "currentValue", "unit", "targetDate", "createdAt", "updatedAt", "milestones"]
     }
   },
   "firestore": {
@@ -286,6 +306,10 @@
     "/users/{userId}/personalIDs/{idRecordId}": {
       "schema": "PersonalID",
       "description": "Subcollection of user ID cards profiles"
+    },
+    "/users/{userId}/goals/{goalId}": {
+      "schema": "Goal",
+      "description": "Subcollection of user long-term goals and milestones tracking"
     }
   }
 }
