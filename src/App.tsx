@@ -17,12 +17,14 @@ import { WeightTab } from "./components/WeightTab";
 import { StudyTab } from "./components/StudyTab";
 import { SafeTab } from "./components/SafeTab";
 import { AssetsTab } from "./components/AssetsTab";
+import { GoalsTab } from "./components/GoalsTab";
+import { GeminiAdvisor } from "./components/GeminiAdvisor";
 import { generatePDFReport } from "./utils/pdfGenerator";
 
 import { 
   Sparkles, Shield, User, Wallet, ClipboardList, Flame, 
   HeartHandshake, Dumbbell, Pill, Scale, GraduationCap, Lock, LockOpen, FolderLock, FileSpreadsheet,
-  FileDown, Coins
+  FileDown, Coins, Target
 } from "lucide-react";
 
 export default function App() {
@@ -120,8 +122,8 @@ export default function App() {
         </div>
 
         {/* Dropdown for interactive PDF timeframe */}
-        <div className="relative flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 transition-all cursor-pointer">
-          <FileDown className="w-4 h-4 text-indigo-605 text-indigo-600" />
+        <div className="relative flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 transition-all cursor-pointer" title="Compile Premium Vault PDF">
+          <FileDown className="w-4 h-4 text-indigo-600" />
           <select
             defaultValue=""
             onChange={(e) => {
@@ -135,19 +137,18 @@ export default function App() {
               }
             }}
             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            title="Export Telemetry PDF"
           >
-            <option value="" disabled>Export PDF...</option>
-            <option value="daily">Daily PDF</option>
-            <option value="weekly">Weekly PDF</option>
-            <option value="monthly">Monthly PDF</option>
-            <option value="yearly">Yearly PDF</option>
+            <option value="" disabled>Compile Premium Report...</option>
+            <option value="daily">Daily Deep Ledger PDF</option>
+            <option value="weekly">Weekly Performance & Finance PDF</option>
+            <option value="monthly">Monthly Combined Telemetry PDF</option>
+            <option value="yearly">Yearly Ultimate Summary PDF</option>
           </select>
         </div>
       </header>
 
       {/* Main viewport Container designed for mobile-first ratios */}
-      <main className="flex-1 p-4 max-w-md mx-auto w-full bg-white shadow-xl border-x border-slate-200/50 min-h-[calc(100vh-8rem)]">
+      <main className="flex-1 p-4 max-w-md mx-auto w-full bg-white shadow-xl border-x border-slate-200/50 min-h-[calc(100vh-8rem)] relative">
         {activeTab === "dashboard" && <DashboardTab setActiveTab={setActiveTab} />}
         {activeTab === "expenses" && <ExpensesTab />}
         {activeTab === "bills" && <BillsTab />}
@@ -159,6 +160,7 @@ export default function App() {
         {activeTab === "study" && <StudyTab />}
         {activeTab === "safe" && <SafeTab />}
         {activeTab === "assets" && <AssetsTab />}
+        {activeTab === "goals" && <GoalsTab />}
       </main>
 
       {/* Modern High-contrast bottom tab bar Navigation for mobile viewports */}
@@ -191,6 +193,16 @@ export default function App() {
         >
           <GraduationCap className="w-4.5 h-4.5" />
           <span className="text-[9px] font-bold">Study</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("goals")}
+          className={`flex flex-col items-center gap-1 transition-all ${
+            activeTab === "goals" ? "text-indigo-600 scale-105 font-bold" : "text-slate-400"
+          }`}
+        >
+          <Target className="w-4.5 h-4.5" />
+          <span className="text-[9px] font-bold">Goals</span>
         </button>
 
         <button
