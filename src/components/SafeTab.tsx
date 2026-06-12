@@ -3,7 +3,7 @@ import { useApp } from "../AppContext";
 import { 
   Plus, Trash2, Key, Search, FolderLock, Download, Upload, 
   ShieldCheck, Eye, EyeOff, CreditCard, Shield, Sparkles,
-  Copy, Check, FileText, X, Cloud, RefreshCw, LogIn, LogOut, Settings2, FileUp
+  Copy, Check, FileText, X, Cloud, RefreshCw, LogIn, LogOut, Settings2, FileUp, Fingerprint
 } from "lucide-react";
 import { SecureDocument } from "../types";
 
@@ -12,10 +12,11 @@ export const SafeTab: React.FC = () => {
     passwords, addPassword, deletePassword, 
     documents, addDocument, deleteDocument,
     personalIDs, addPersonalID, deletePersonalID,
-    exportData, importData
+    exportData, importData,
+    userState, toggleBiometric, changeLockPassword
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<"passwords" | "ids" | "documents">("passwords");
+  const [activeTab, setActiveTab] = useState<"passwords" | "ids" | "documents" | "settings">("passwords");
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedID, setCopiedID] = useState<string | null>(null);
   const [previewDoc, setPreviewDoc] = useState<SecureDocument | null>(null);
@@ -41,6 +42,12 @@ export const SafeTab: React.FC = () => {
   const [idNumber, setIdNumber] = useState("");
   const [nameOnID, setNameOnID] = useState("Akash Chaudhary");
   const [idNotes, setIdNotes] = useState("");
+
+  // Lock Screen PIN Changer settings states
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [lockError, setLockError] = useState("");
+  const [lockSuccess, setLockSuccess] = useState("");
 
   const handleAddSecret = (e: React.FormEvent) => {
     e.preventDefault();
@@ -279,6 +286,14 @@ export const SafeTab: React.FC = () => {
           }`}
         >
           File Cabinet ({documents.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("settings")}
+          className={`flex-1 min-w-[70px] text-center py-2 rounded-lg transition-all cursor-pointer ${
+            activeTab === "settings" ? "bg-white text-indigo-650 shadow-sm" : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          Lock &amp; Biometrics
         </button>
       </div>
 
@@ -692,6 +707,167 @@ export const SafeTab: React.FC = () => {
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Settings & Security Tab */}
+      {activeTab === "settings" && (
+        <div className="space-y-4 text-left">
+          {/* Main PIN code changer card */}
+          <div className="bg-white border border-slate-150 rounded-2xl p-4.5 space-y-4 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Key className="w-4 h-4 text-indigo-600 animate-pulse" />
+              <h3 className="font-extrabold text-xs text-slate-800 uppercase tracking-wider">Change Vault Lock PIN</h3>
+            </div>
+
+            <p className="text-[10px] text-slate-450 leading-normal font-semibold">
+              Update the 4-digit numeric passcode protecting your app. This PIN is stored securely in your encrypted profile and automatically synchronized via Google Firebase Firestore when logged in.
+            </p>
+
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              setLockError("");
+              setLockSuccess("");
+
+              if (!/^\d{4}$/.test(newPin)) {
+                setLockError("Passcode PIN must be exactly 4 numeric digits.");
+                return;
+              }
+
+              if (newPin !== confirmPin) {
+                setLockError("Confirmation PIN code does not match. Please re-enter.");
+                return;
+              }
+
+              changeLockPassword(newPin);
+              setLockSuccess("Vault passcode PIN changed successfully! Syncing to Cloud... 🎉");
+              setNewPin("");
+              setConfirmPin("");
+            }} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[9px] text-slate-500 font-bold block mb-1 uppercase tracking-wider font-mono">New PIN Code</label>
+                  <input 
+                    type="password" 
+                    maxLength={4}
+                    placeholder="Enter 4 digits"
+                    value={newPin}
+                    onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
+                    required
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-indigo-400 font-mono tracking-widest text-center"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[9px] text-slate-500 font-bold block mb-1 uppercase tracking-wider font-mono">Confirm PIN</label>
+                  <input 
+                    type="password" 
+                    maxLength={4}
+                    placeholder="Confirm PIN"
+                    value={confirmPin}
+                    onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+                    required
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:border-indigo-400 font-mono tracking-widest text-center"
+                  />
+                </div>
+              </div>
+
+              {/* Status flags */}
+              {lockError && (
+                <div className="bg-rose-50 border border-rose-100 text-rose-600 text-[10.5px] font-bold p-2.5 rounded-xl">
+                  ⚠️ {lockError}
+                </div>
+              )}
+
+              {lockSuccess && (
+                <div className="bg-emerald-50 border border-emerald-100 text-emerald-650 text-[10.5px] font-bold p-2.5 rounded-xl">
+                  ✨ {lockSuccess}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2 rounded-xl text-xs tracking-wider uppercase transition-colors shadow-sm cursor-pointer"
+              >
+                Sync &amp; Change Passcode PIN
+              </button>
+            </form>
+          </div>
+
+          {/* Biometrics Settings Card */}
+          <div className="bg-white border border-slate-150 rounded-2xl p-4.5 space-y-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Fingerprint className="w-5 h-5 text-indigo-600" />
+                <div>
+                  <h3 className="font-extrabold text-xs text-slate-800 uppercase tracking-wider">Haptic Biometric Vault</h3>
+                  <span className="text-[8px] font-mono text-slate-405">STATUS: {userState.biometricActive ? "ACTIVE & SYNCED" : "DISABLED"}</span>
+                </div>
+              </div>
+
+              <button
+                onClick={toggleBiometric}
+                className={`w-12 h-6.5 rounded-full p-0.5 transition-colors duration-300 relative ${
+                  userState.biometricActive ? "bg-indigo-600" : "bg-slate-200"
+                }`}
+              >
+                <div className={`w-5.5 h-5.5 bg-white rounded-full shadow-sm transition-transform duration-300 transform ${
+                  userState.biometricActive ? "translate-x-5.5" : "translate-x-0"
+                }`} />
+              </button>
+            </div>
+
+            <p className="text-[10px] text-slate-400 leading-normal font-semibold">
+              When toggled, this enables fast simulated fingerprint/biometric bypass triggers on your active lock screen. Changes sync immediately to your personal Google Cloud configuration profiles.
+            </p>
+          </div>
+
+          {/* Device Sync & Active Diagnostics Card */}
+          <div className="bg-gradient-to-br from-[#0c1612] to-slate-900 border border-emerald-950/40 rounded-2xl p-4.5 space-y-3.5 text-slate-300 shadow-md">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Cloud className="w-5 h-5 text-emerald-400 animate-pulse" />
+                <div>
+                  <h4 className="text-xs font-black uppercase text-emerald-400 tracking-wider">Cloud Sync State Diagnostic</h4>
+                  <span className="text-[8.5px] font-bold text-slate-400 font-mono font-semibold">MILITARY-LEVEL AES CORE ACTIVE</span>
+                </div>
+              </div>
+              <span className="text-[8px] font-mono font-black bg-emerald-950/40 border border-emerald-900 text-emerald-400 px-2 py-0.5 rounded-full uppercase">
+                Active
+              </span>
+            </div>
+
+            <div className="bg-[#11241a] border border-emerald-900/30 p-2.5 rounded-xl space-y-1.5 text-[9.5px]">
+              <div className="flex justify-between font-mono">
+                <span className="text-slate-400 font-bold uppercase font-semibold">Active Security Factor</span>
+                <span className="font-bold text-emerald-455 uppercase">{userState.biometricActive ? "Biometrics + Email" : "Email Only"}</span>
+              </div>
+              <div className="flex justify-between font-mono">
+                <span className="text-slate-400 font-bold uppercase font-semibold">Connected Passwords</span>
+                <span className="font-bold text-emerald-400 uppercase">{passwords.length} Entries</span>
+              </div>
+              <div className="flex justify-between font-mono">
+                <span className="text-slate-400 font-bold uppercase font-semibold">Stored Documents</span>
+                <span className="font-bold text-emerald-400 uppercase">{documents.length} Files</span>
+              </div>
+              <div className="flex justify-between font-mono">
+                <span className="text-slate-400 font-bold uppercase font-semibold">Stored personal IDs</span>
+                <span className="font-bold text-emerald-400 uppercase">{personalIDs.length} Cards</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2 text-xs font-bold pt-1">
+              <button
+                onClick={() => {
+                  exportData();
+                  alert("Local credentials backup schema exported to file!");
+                }}
+                className="flex-1 text-center py-2 bg-white/5 border border-white/10 hover:bg-white/10 text-slate-200 hover:text-white rounded-xl text-[10.5px] transition-colors cursor-pointer font-mono font-bold uppercase tracking-wide"
+              >
+                Local Export Backups
+              </button>
             </div>
           </div>
         </div>
