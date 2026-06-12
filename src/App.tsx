@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from "react";
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { useApp } from "./AppContext";
 import { LockScreen } from "./components/LockScreen";
 import { DashboardTab } from "./components/DashboardTab";
@@ -108,6 +109,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 flex flex-col justify-between font-sans relative pb-20 select-none">
+      <SpeedInsights />
       {/* Upper Navigation Header */}
       <header className="border-b border-slate-100 bg-white/95 backdrop-blur-md sticky top-0 z-40 px-4 py-3 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab("dashboard")}>
