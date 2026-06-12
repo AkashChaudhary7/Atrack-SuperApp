@@ -1,280 +1,541 @@
-import React, { useState, useMemo } from "react";
-import { useApp } from "../AppContext";
-import { Plus, Trash2, CheckCircle, Flame, Calendar, Sparkles, TrendingUp, Award, Activity } from "lucide-react";
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
-export const HabitsTab: React.FC = () => {
-  const { habits, addHabit, toggleHabitDate, deleteHabit, isCircadian } = useApp();
-  const [newHabit, setNewHabit] = useState("");
-  const [hoveredDay, setHoveredDay] = useState<{ habitId: string; date: string; isCompleted: boolean } | null>(null);
-  const [hoveredGlobalDay, setHoveredGlobalDay] = useState<{ date: string; completedCount: number; totalCount: number; percent: number } | null>(null);
+import React, { useState, useEffect } from "react";
+import { useApp } from "./AppContext";
+import { LockScreen } from "./components/LockScreen";
+import { DashboardTab } from "./components/DashboardTab";
+import { ExpensesTab } from "./components/ExpensesTab";
+import { BillsTab } from "./components/BillsTab";
+import { HabitsTab } from "./components/HabitsTab";
+import { PerformanceTab } from "./components/PerformanceTab";
+import { WorkoutTab } from "./components/WorkoutTab";
+import { MedicineTab } from "./components/MedicineTab";
+import { WeightTab } from "./components/WeightTab";
+import { StudyTab } from "./components/StudyTab";
+import { SafeTab } from "./components/SafeTab";
+import { AssetsTab } from "./components/AssetsTab";
+import { GoalsTab } from "./components/GoalsTab";
+import { SleepTab } from "./components/SleepTab";
+import { GeminiAdvisor } from "./components/GeminiAdvisor";
+import { generatePDFReport } from "./utils/pdfGenerator";
+import { motion, AnimatePresence } from "motion/react";
 
-  const todayStr = new Date().toISOString().split("T")[0];
+import { 
+  Sparkles, Shield, User, Wallet, ClipboardList, Flame, 
+  HeartHandshake, Dumbbell, Pill, Scale, GraduationCap, Lock, LockOpen, FolderLock, FileSpreadsheet,
+  FileDown, Coins, Target, Download, Eye, Sun, Moon, Bell, BellOff
+} from "lucide-react";
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newHabit.trim()) {
-      addHabit(newHabit.trim());
-      setNewHabit("");
+export default function App() {
+  const { userState, expenses, bills, habits, intimacyLogs, jerkOffLogs, medicines, weightRecords, workouts, tasks, studySessions, assetAccounts, currentUser, signInWithGoogle, signOutUser, isCircadian, toggleCircadian } = useApp();
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<string>(() => {
+    return typeof window !== "undefined" && "Notification" in window ? Notification.permission : "unsupported";
+  });
+
+  const handleCloudSyncClick = async () => {
+    setSyncError(null);
+    try {
+      await signInWithGoogle();
+    } catch (err: any) {
+      console.error("Cloud Sync Error caught:", err);
+      let errMsg = "Google authentication popup could not be established.";
+      if (typeof window !== "undefined" && window.self !== window.top) {
+        errMsg = "Security policies inside this preview iframe prevent Google Sign-in popups from opening directly.";
+      } else if (err?.code === "auth/popup-blocked") {
+        errMsg = "The Google login popup was blocked by your browser. Please allow popups for this site.";
+      } else if (err?.message) {
+        errMsg = err.message;
+      }
+      setSyncError(errMsg);
     }
   };
 
-  // Generate the last 30 calendar days dynamically for the heat-map matrix
-  const last30Days = useMemo(() => {
-    return [...Array(30)].map((_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (29 - i));
-      return d.toISOString().split("T")[0];
-    });
+  const handleRequestNotificationPermission = async () => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      try {
+        const res = await Notification.requestPermission();
+        setNotificationPermission(res);
+        if (res === "granted") {
+          setShowNotificationModal(false);
+        }
+      } catch (err) {
+        console.error("Failed requesting permission:", err);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
-  // Compute overall habit streaks and 30-day aggregate statistics
-  const heatmapStats = useMemo(() => {
-    if (habits.length === 0) {
-      return { currentStreak: 0, maxStreak: 0, consistency: 0, totalCompletions: 0 };
-    }
-
-    let totalPossible = habits.length * 30;
-    let totalCompleted = 0;
-    let currentStreak = 0;
-    let maxStreak = 0;
-    let tempStreak = 0;
-
-    // Check streak of days with AT LEAST one habit completed in the last 30 days
-    last30Days.forEach(day => {
-      const dayCompletions = habits.filter(h => h.completedDates.includes(day)).length;
-      if (dayCompletions > 0) {
-        tempStreak++;
-        if (tempStreak > maxStreak) {
-          maxStreak = tempStreak;
-        }
-      } else {
-        tempStreak = 0;
-      }
-      totalCompleted += dayCompletions;
-    });
-
-    // Calculate current running streak backwards from today
-    const reverseDays = [...last30Days].reverse();
-    const todayCompleted = habits.filter(h => h.completedDates.includes(todayStr)).length > 0;
-    
-    const yesterdayDate = new Date();
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterdayStr = yesterdayDate.toISOString().split("T")[0];
-    const yesterdayCompleted = habits.filter(h => h.completedDates.includes(yesterdayStr)).length > 0;
-
-    if (todayCompleted || yesterdayCompleted) {
-      for (const day of reverseDays) {
-        // Skip today in streak checking if it is empty but yesterday was completed (protects running streak)
-        if (day === todayStr && !todayCompleted) {
-          continue;
-        }
-        const dayCompletions = habits.filter(h => h.completedDates.includes(day)).length;
-        if (dayCompletions > 0) {
-          currentStreak++;
-        } else {
-          break;
-        }
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
       }
     }
-
-    const consistency = Math.round((totalCompleted / totalPossible) * 100);
-
-    return { currentStreak, maxStreak, consistency, totalCompletions: totalCompleted };
-  }, [habits, last30Days, todayStr]);
-
-  // Helper function to return intensity scale level for a specific date
-  const getDayIntensityInfo = (date: string) => {
-    if (habits.length === 0) return { percent: 0, completedCount: 0, level: 0 };
-    const completedCount = habits.filter(h => h.completedDates.includes(date)).length;
-    const totalCount = habits.length;
-    const percent = Math.round((completedCount / totalCount) * 100);
-    
-    let level = 0;
-    if (percent > 0 && percent <= 25) level = 1;
-    else if (percent > 25 && percent <= 50) level = 2;
-    else if (percent > 50 && percent <= 75) level = 3;
-    else if (percent > 75) level = 4;
-
-    return { percent, completedCount, totalCount, level };
   };
 
-  // Class style maps for color-coded intensity scale
-  const intensityStylesLight = [
-    "bg-slate-100 hover:bg-slate-200 border-slate-200/40 text-slate-400", // Level 0
-    "bg-teal-100/80 hover:bg-teal-200 border-teal-200/50 text-teal-800", // Level 1 (25% or less)
-    "bg-teal-300 hover:bg-teal-400 border-teal-400/40 text-teal-905", // Level 2 (26% - 50%)
-    "bg-teal-500 hover:bg-teal-600 border-teal-600/30 text-white", // Level 3 (51% - 75%)
-    "bg-teal-700 hover:bg-teal-800 border-teal-800/30 text-teal-50" // Level 4 (76% - 100%)
-  ];
+  if (!userState.isAuthenticated) {
+    return <LockScreen />;
+  }
 
-  const intensityStylesCircadian = [
-    "bg-[#070b09] hover:bg-emerald-950/20 border-emerald-950/80 text-emerald-950", // Level 0
-    "bg-emerald-950/40 hover:bg-emerald-950/60 border-emerald-900/30 text-emerald-500", // Level 1 (25% or less)
-    "bg-emerald-900/60 hover:bg-emerald-900/80 border-emerald-800/30 text-emerald-300", // Level 2 (26% - 50%)
-    "bg-emerald-700/80 hover:bg-emerald-700 border-emerald-600/30 text-emerald-100", // Level 3 (51% - 75%)
-    "bg-emerald-500 hover:bg-emerald-400 border-emerald-400/30 text-[#0c1612] shadow-[0_0_8px_rgba(16,185,129,0.25)]" // Level 4 (76% - 100%)
-  ];
+  // Handle download of detailed reports as CSV format dynamically
+  const triggerMetricsDownload = () => {
+    const { expenses, bills, habits, intimacyLogs, jerkOffLogs, medicines, weightRecords, workouts, studySessions } = useApp();
+    
+    let csvContent = "data:text/csv;charset=utf-8,";
+    
+    csvContent += "=== ATRACK PERFORMANCE & FINANCIAL SUMMARY REPORT ===\n\n";
+
+    // Expenses
+    csvContent += "--- Expenses ---\nCategory,Description,Amount,Date\n";
+    expenses.forEach(e => {
+      csvContent += `"${e.category}","${e.description.replace(/"/g, '""')}",${e.amount},"${e.date}"\n`;
+    });
+
+    // Bills
+    csvContent += "\n--- Bills/EMIs ---\nTitle,Category,Amount,Due Date,Status\n";
+    bills.forEach(b => {
+      csvContent += `"${b.title}","${b.category}",${b.amount},"${b.dueDate}","${b.isPaid ? 'Paid' : 'Pending'}"\n`;
+    });
+
+    // Habits
+    csvContent += "\n--- Habits Progress ---\nHabit Title,Completed Days count,Current Streak\n";
+    habits.forEach(h => {
+      csvContent += `"${h.name}",${h.completedDates.length},${h.streak} Days\n`;
+    });
+
+    // Intimacy
+    csvContent += "\n--- Intimacy Milestones ---\nPartner Name,Mood,Date,Notes\n";
+    intimacyLogs.forEach(i => {
+      csvContent += `"${i.partnerName}","${i.mood}","${i.date}","${(i.notes || '').replace(/"/g, '""')}"\n`;
+    });
+
+    // Jerk off logs
+    csvContent += "\n--- Jerk Frequency Logs ---\nDate,Count\n";
+    jerkOffLogs.forEach(l => {
+      csvContent += `"${l.date}",${l.count}\n`;
+    });
+
+    // Weight Records
+    csvContent += "\n--- Weight Monitor Trends ---\nDate,Weight (kg)\n";
+    weightRecords.forEach(w => {
+      csvContent += `"${w.date}",${w.weight}\n`;
+    });
+
+    // Workouts
+    csvContent += "\n--- Stamina Workouts (Squat & Kegel) ---\nDate,Type,Sets,Reps\n";
+    workouts.forEach(wk => {
+      csvContent += `"${wk.date}","${wk.type}",${wk.sets},${wk.reps}\n`;
+    });
+
+    // Medicines
+    csvContent += "\n--- Medicine Intake Inventory ---\nName,Dosage Daily,Pills Left\n";
+    medicines.forEach(m => {
+      csvContent += `"${m.name}",${m.dosageDaily},${m.totalPillsLeft}\n`;
+    });
+
+    // Study Sessions
+    csvContent += "\n--- Study Sessions ---\nDate,Subject,Duration (Mins)\n";
+    studySessions.forEach(st => {
+      csvContent += `"${st.date}","${st.subject}",${st.durationMinutes}\n`;
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `Atrack_Metrics_Report_${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   return (
-    <div className="space-y-6 font-sans">
-      <div className="flex items-center gap-2">
-        <div className="p-2 bg-gradient-to-tr from-teal-500 to-cyan-600 rounded-xl text-white">
-          <Flame className="w-5 h-5 animate-pulse" />
+    <div className={`min-h-screen flex flex-col justify-between font-sans relative pb-20 select-none transition-colors duration-300 ${isCircadian ? "bg-[#050806] text-emerald-100" : "bg-slate-100 text-slate-800"}`}>
+      {/* Upper Navigation Header */}
+      <header className={`border-b sticky top-0 z-40 px-4 py-3 flex items-center justify-between shadow-sm transition-colors duration-300 ${isCircadian ? "border-emerald-950 bg-[#0a0f0d]/95 text-emerald-100" : "border-slate-100 bg-white/95"}`}>
+        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab("dashboard")}>
+          <div className="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm shadow-indigo-200">
+            <Shield className="w-4.5 h-4.5 animate-pulse" />
+          </div>
+          <div>
+            <h1 className={`text-sm font-display font-black tracking-tight flex items-center gap-1.5 uppercase ${isCircadian ? "text-emerald-400" : "text-slate-800"}`}>
+              Atrack <span className={`text-[9px] font-mono tracking-wider font-bold px-1.5 py-0.5 rounded border ${isCircadian ? "bg-[#0b1c12] border-emerald-800/40 text-emerald-400" : "bg-emerald-50 border-emerald-250 text-emerald-600"}`}>LOCKED</span>
+            </h1>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl font-display font-black text-slate-800 uppercase tracking-tight">Habit routine builder</h2>
-          <p className="text-xs text-slate-500 font-medium">Lock down robust habits, maintain streaks, and trigger routines</p>
-        </div>
-      </div>
 
-      {/* Add new habit */}
-      <form onSubmit={handleSubmit} className="bg-slate-50 border border-slate-150 rounded-2xl p-3 flex gap-2 items-center shadow-sm text-sm">
-        <input 
-          type="text" 
-          placeholder="New daily habit choice..."
-          value={newHabit}
-          onChange={(e) => setNewHabit(e.target.value)}
-          required
-          className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-        />
-        <button 
-          type="submit"
-          className="bg-gradient-to-tr from-teal-500 to-cyan-600 hover:opacity-95 text-white p-2.5 rounded-xl flex items-center justify-center font-bold active:scale-95 transition-all shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-        </button>
-      </form>
-
-      {/* Habit List */}
-      <div className="space-y-3">
-        <span className="text-[10px] font-bold text-slate-400 tracking-wider font-mono uppercase">YOUR DECLARED HABITS</span>
-
-        <div className="space-y-3">
-          {habits.length === 0 ? (
-            <p className={`text-xs text-center py-6 border rounded-2xl italic ${isCircadian ? "bg-[#0b120f] border-emerald-950 text-slate-500" : "bg-slate-50 border-slate-150 text-slate-400"}`}>Create robust habits to start tracking.</p>
+        <div className="flex items-center gap-2">
+          {currentUser ? (
+            <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-xl px-2.5 py-1" title={`Cloud Synced as ${currentUser.email}`}>
+              {currentUser.photoURL ? (
+                <img 
+                  src={currentUser.photoURL} 
+                  alt="Avatar" 
+                  referrerPolicy="no-referrer"
+                  className="w-4 h-4 rounded-full border border-emerald-300"
+                />
+              ) : (
+                <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[8px] font-bold">✓</div>
+              )}
+              <span className="text-[10px] font-bold text-emerald-700 tracking-tight cursor-pointer" onClick={() => { if (window.confirm("Sign out from Google Cloud Sync?")) signOutUser(); }}>
+                Synced
+              </span>
+            </div>
           ) : (
-            habits.map(habit => {
-              const isDoneToday = habit.completedDates.includes(todayStr);
+            <button
+              onClick={handleCloudSyncClick}
+              className="flex items-center gap-1 bg-white border border-slate-200 hover:bg-slate-50 text-[10px] text-slate-700 font-bold px-2.5 py-1 rounded-xl transition-all shadow-sm cursor-pointer animate-pulse"
+              title="Authenticate with Google to activate multi-device cloud synchronization"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-spin" />
+              <span>Cloud Sync</span>
+            </button>
+          )}
 
-              return (
-                <div 
-                  key={habit.id} 
-                  className={`border rounded-2xl p-4 flex flex-col gap-3 shadow-sm transition-all duration-305 ${
+          {/* Browser Notification Status Indicator */}
+          <button
+            onClick={() => setShowNotificationModal(true)}
+            className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all cursor-pointer relative ${
+              notificationPermission === "granted"
+                ? (isCircadian ? "bg-emerald-950/40 border-emerald-900/40 text-emerald-450 hover:bg-emerald-950/60" : "bg-emerald-50 border-emerald-150 text-emerald-600 hover:bg-emerald-100/50")
+                : (isCircadian ? "bg-[#1a1011] border-rose-950/60 text-rose-400 hover:bg-[#231517]" : "bg-rose-50/50 border-rose-150 text-rose-600 hover:bg-rose-100")
+            }`}
+            title={`Habit alarms setting (Permission: ${notificationPermission})`}
+          >
+            {notificationPermission === "granted" ? (
+              <Bell className="w-4 h-4" />
+            ) : (
+              <BellOff className="w-4 h-4" />
+            )}
+            {notificationPermission !== "granted" && (
+              <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span>
+            )}
+          </button>
+
+          {deferredPrompt && (
+            <button
+              onClick={handleInstallClick}
+              className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1.5 rounded-lg text-[10px] font-bold shadow-sm transition-colors uppercase tracking-wide"
+            >
+              <Download className="w-3.5 h-3.5" /> Install App
+            </button>
+          )}
+
+          {/* Dropdown for interactive PDF timeframe */}
+          <div className="relative flex items-center justify-center w-8 h-8 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 transition-all cursor-pointer" title="Compile Premium Vault PDF">
+            <FileDown className="w-4 h-4 text-indigo-600" />
+            <select
+              defaultValue=""
+              onChange={(e) => {
+                if (e.target.value) {
+                  const choice = e.target.value as "daily" | "weekly" | "monthly" | "yearly";
+                  generatePDFReport(choice, {
+                    profile: userState.currentProfile,
+                    expenses, bills, habits, intimacyLogs, jerkOffLogs, medicines, weightRecords, workouts, tasks, studySessions, assetAccounts
+                  });
+                  e.target.value = ""; // Reset pick
+                }
+              }}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            >
+              <option value="" disabled>Compile Premium Report...</option>
+              <option value="daily">Daily Deep Ledger PDF</option>
+              <option value="weekly">Weekly Performance & Finance PDF</option>
+              <option value="monthly">Monthly Combined Telemetry PDF</option>
+              <option value="yearly">Yearly Ultimate Summary PDF</option>
+            </select>
+          </div>
+
+          {/* Circadian Eye-Care Toggle */}
+          <button
+            onClick={toggleCircadian}
+            className={`w-8 h-8 rounded-xl flex items-center justify-center border transition-all cursor-pointer ${
+              isCircadian 
+                ? "bg-emerald-950/60 border-emerald-850/50 text-emerald-400 hover:bg-emerald-900/50" 
+                : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100"
+            }`}
+            title={isCircadian ? "Switch to daylight mode" : "Switch to late-night eye-care theme"}
+          >
+            {isCircadian ? <Moon className="w-4 h-4 text-emerald-400" /> : <Eye className="w-4 h-4 text-slate-505" />}
+          </button>
+        </div>
+      </header>
+
+      {/* Main viewport Container designed for mobile-first ratios */}
+      <main className={`flex-1 p-4 max-w-md mx-auto w-full min-h-[calc(100vh-8rem)] relative transition-all duration-300 ${isCircadian ? "bg-[#0a0f0c] shadow-2xl shadow-emerald-980/40 border-x border-emerald-950" : "bg-white shadow-xl border-x border-slate-200/50"}`}>
+        {activeTab === "dashboard" && <DashboardTab setActiveTab={setActiveTab} />}
+        {activeTab === "expenses" && <ExpensesTab />}
+        {activeTab === "bills" && <BillsTab />}
+        {activeTab === "habits" && <HabitsTab />}
+        {activeTab === "performance" && <PerformanceTab />}
+        {activeTab === "workout" && <WorkoutTab />}
+        {activeTab === "medicine" && <MedicineTab />}
+        {activeTab === "weight" && <WeightTab />}
+        {activeTab === "study" && <StudyTab />}
+        {activeTab === "safe" && <SafeTab />}
+        {activeTab === "assets" && <AssetsTab />}
+        {activeTab === "goals" && <GoalsTab />}
+        {activeTab === "sleep" && <SleepTab />}
+      </main>
+
+      {/* Modern High-contrast bottom tab bar Navigation for mobile viewports */}
+      <nav className={`fixed bottom-0 left-0 right-0 z-40 border-t px-2 py-2 flex justify-around shadow-lg transition-colors duration-300 ${isCircadian ? "border-emerald-950 bg-[#0a0f0d]/95 backdrop-blur-lg" : "border-slate-150 bg-white/95"}`}>
+        <button
+          onClick={() => setActiveTab("dashboard")}
+          className={`flex flex-col items-center gap-1 transition-all ${
+            activeTab === "dashboard" ? (isCircadian ? "text-emerald-400 scale-105 font-bold" : "text-indigo-600 scale-105 font-bold") : "text-slate-400 hover:text-slate-500"
+          }`}
+        >
+          <Shield className="w-4.5 h-4.5" />
+          <span className="text-[9px] font-bold">Home</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("performance")}
+          className={`flex flex-col items-center gap-1 transition-all ${
+            activeTab === "performance" ? (isCircadian ? "text-emerald-400 scale-105 font-bold" : "text-indigo-600 scale-105 font-bold") : "text-slate-400 hover:text-slate-500"
+          }`}
+        >
+          <HeartHandshake className="w-4.5 h-4.5" />
+          <span className="text-[9px] font-bold">Intimacy</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("study")}
+          className={`flex flex-col items-center gap-1 transition-all ${
+            activeTab === "study" ? (isCircadian ? "text-emerald-400 scale-105 font-bold" : "text-indigo-600 scale-105 font-bold") : "text-slate-400 hover:text-slate-500"
+          }`}
+        >
+          <GraduationCap className="w-4.5 h-4.5" />
+          <span className="text-[9px] font-bold">Study</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("goals")}
+          className={`flex flex-col items-center gap-1 transition-all ${
+            activeTab === "goals" ? (isCircadian ? "text-emerald-400 scale-105 font-bold" : "text-indigo-600 scale-105 font-bold") : "text-slate-400 hover:text-slate-500"
+          }`}
+        >
+          <Target className="w-4.5 h-4.5" />
+          <span className="text-[9px] font-bold">Goals</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab("safe")}
+          className={`flex flex-col items-center gap-1 transition-all ${
+            activeTab === "safe" ? (isCircadian ? "text-emerald-400 scale-105 font-bold" : "text-indigo-600 scale-105 font-bold") : "text-slate-400 hover:text-slate-500"
+          }`}
+        >
+          <FolderLock className="w-4.5 h-4.5" />
+          <span className="text-[9px] font-bold">Safe</span>
+        </button>
+      </nav>
+
+      {/* Cloud Sync Failure / Cross-Origin Iframe Help Dialog */}
+      <AnimatePresence>
+        {syncError && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-xs" id="sync-error-backdrop">
+            <motion.div
+              initial={{ opacity: 0, y: 15, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              className={`w-full max-w-sm border rounded-3xl p-5 shadow-2xl relative ${
+                isCircadian 
+                  ? "bg-[#0a0f0d] border-emerald-900/60 text-emerald-100" 
+                  : "bg-white border-slate-150 text-slate-800"
+              }`}
+              id="sync-error-card"
+            >
+              <div className="text-center space-y-4">
+                <div className={`mx-auto w-12 h-12 rounded-2xl flex items-center justify-center border shadow-sm ${
+                  isCircadian ? "bg-emerald-950/20 border-emerald-900/40 text-emerald-400" : "bg-indigo-50 border-indigo-100 text-indigo-600"
+                }`} id="sync-error-icon-box">
+                  <Sparkles className="w-5 h-5 animate-pulse" />
+                </div>
+                
+                <div className="space-y-1">
+                  <h3 className="font-display font-black text-xs uppercase tracking-wider">
+                    Cloud Sync Auth Restricted
+                  </h3>
+                  <p className="text-[11px] text-slate-400 leading-normal px-2">
+                    {syncError}
+                  </p>
+                </div>
+
+                <div className={`text-[10px] p-3 rounded-2xl border text-left leading-normal font-medium ${
+                  isCircadian 
+                    ? "bg-emerald-950/10 border-emerald-900/20 text-emerald-300" 
+                    : "bg-indigo-50/50 border-indigo-100 text-indigo-700"
+                }`} id="sync-error-tip">
+                  💡 **Pro Tip:** Google Sign-in popups are often blocked by standard browser sandbox policies inside preview iframes. Open this app in a **new standalone browser tab** to sync without restriction!
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 mt-5" id="sync-error-actions">
+                <button
+                  onClick={() => setSyncError(null)}
+                  className={`flex-1 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border text-center cursor-pointer ${
                     isCircadian 
-                      ? "bg-[#0e1411] border-emerald-950/60 hover:border-emerald-800/40" 
-                      : "bg-white border-slate-150 hover:border-slate-350"
+                      ? "bg-transparent hover:bg-emerald-950/20 border-emerald-900/40 text-emerald-400" 
+                      : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600"
                   }`}
+                  id="btn-dismiss-sync-error"
                 >
-                  {/* Top: Details & Actions Row */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex gap-2.5 items-center">
-                      <button
-                        onClick={() => toggleHabitDate(habit.id, todayStr)}
-                        className={`w-6.5 h-6.5 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
-                          isDoneToday 
-                            ? (isCircadian ? "bg-emerald-500 border-emerald-600 text-[#0c1612] scale-105 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-teal-500 border-teal-600 text-white scale-105 shadow-sm")
-                            : (isCircadian ? "border-emerald-900 bg-[#070b09] hover:border-emerald-600 text-emerald-800" : "border-slate-300 bg-white hover:border-teal-500 text-slate-300")
-                        }`}
-                        title="Tick today?"
-                      >
-                        {isDoneToday && <CheckCircle className={`w-4 h-4 ${isCircadian ? "text-slate-900" : "text-white"}`} />}
-                      </button>
+                  Dismiss
+                </button>
+                <a
+                  href={window.location.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setSyncError(null)}
+                  className={`flex-1 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all text-center cursor-pointer flex items-center justify-center ${
+                    isCircadian 
+                      ? "bg-emerald-500 hover:bg-emerald-400 text-emerald-955" 
+                      : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                  }`}
+                  id="btn-tab-sync-error"
+                >
+                  Open in New Tab
+                </a>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
-                      <div className="text-left">
-                        <h4 className={`text-xs font-black ${
-                          isDoneToday 
-                            ? 'line-through text-slate-450' 
-                            : (isCircadian ? 'text-emerald-100' : 'text-slate-800')
-                        }`}>
-                          {habit.name}
-                        </h4>
-                        <p className={`text-[9.5px] font-semibold ${isCircadian ? "text-emerald-600/80" : "text-slate-450"}`}>
-                          Completions: <span className="font-mono">{habit.completedDates.length}</span> total logs
-                        </p>
-                      </div>
-                    </div>
+      {/* Habits & Alarms Notification Help Dialog */}
+      <AnimatePresence>
+        {showNotificationModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-xs" id="notif-modal-backdrop">
+            <motion.div
+              initial={{ opacity: 0, y: 15, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 10, scale: 0.95 }}
+              className={`w-full max-w-sm border rounded-3xl p-5 shadow-2xl relative ${
+                isCircadian 
+                  ? "bg-[#0a0f0d] border-emerald-900/60 text-emerald-100" 
+                  : "bg-white border-slate-150 text-slate-800"
+              }`}
+              id="notif-modal-card"
+            >
+              <div className="text-center space-y-4">
+                <div className={`mx-auto w-12 h-12 rounded-2xl flex items-center justify-center border shadow-sm ${
+                  notificationPermission === "granted"
+                    ? (isCircadian ? "bg-emerald-950/20 border-emerald-900/40 text-emerald-400" : "bg-emerald-50 border-emerald-100 text-emerald-600")
+                    : (isCircadian ? "bg-rose-950/15 border-rose-900/30 text-rose-450" : "bg-rose-50 border-rose-100 text-rose-600")
+                }`} id="notif-modal-icon-box">
+                  {notificationPermission === "granted" ? <Bell className="w-5 h-5" /> : <BellOff className="w-5 h-5" />}
+                </div>
 
-                    <div className="flex items-center gap-2">
-                      <div className={`flex items-center gap-1 border rounded-full px-2 py-0.5 ${
-                        isCircadian 
-                          ? "bg-emerald-950/20 border-emerald-900/30 text-emerald-400" 
-                          : "bg-slate-50 border-slate-150 text-slate-700"
-                      }`}>
-                        <Flame className={`w-3 h-3 ${habit.streak > 0 ? "text-orange-500 animate-pulse" : "text-slate-450"}`} />
-                        <span className="text-[9.5px] font-black font-mono leading-none">{habit.streak}d streak</span>
-                      </div>
-
-                      <button
-                        onClick={() => {
-                          if (confirm(`Do you wish to delete habit "${habit.name}"? This will erase all historic completion logs.`)) {
-                            deleteHabit(habit.id);
-                          }
-                        }}
-                        className="text-slate-400 hover:text-rose-600 p-1 transition-colors cursor-pointer"
-                        title="Remove Habit"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Divider line */}
-                  <div className={`border-t ${isCircadian ? "border-emerald-950/50" : "border-slate-100"}`} />
-
-                  {/* Bottom: The GitHub-Style Habit Grid */}
-                  <div className="space-y-1.5 text-left">
-                    <div className="flex justify-between items-center text-[8.5px] font-bold uppercase tracking-wider font-mono text-slate-400">
-                      <span>30-Day Completion Matrix</span>
-                      <span className="text-[7.5px] font-semibold text-slate-450 text-right">Lately →</span>
-                    </div>
-
-                    {/* Matrix blocks flex timeline */}
-                    <div className="flex flex-wrap gap-1.5 items-center justify-between bg-slate-50/40 dark:bg-emerald-950/5 p-1.5 border border-slate-100/50 dark:border-emerald-950/20 rounded-xl">
-                      {last30Days.map(date => {
-                        const isCompleted = habit.completedDates.includes(date);
-                        const isHovered = hoveredDay?.habitId === habit.id && hoveredDay?.date === date;
-
-                        return (
-                          <div
-                            key={date}
-                            onMouseEnter={() => setHoveredDay({ habitId: habit.id, date, isCompleted })}
-                            onMouseLeave={() => setHoveredDay(null)}
-                            className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-[3px] transition-all cursor-pointer relative ${
-                              isCompleted
-                                ? (isCircadian 
-                                    ? "bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.5)] scale-102" 
-                                    : "bg-teal-500 shadow-[0_0_4px_rgba(20,184,166,0.3)] scale-102")
-                                : (isCircadian
-                                    ? "bg-[#070b09] border border-emerald-950 hover:bg-emerald-950/30"
-                                    : "bg-slate-100 border border-slate-200/50 hover:bg-slate-200/80")
-                            }`}
-                          />
-                        );
-                      })}
-                    </div>
-
-                    {/* Interactive hover tooltip display */}
-                    <div className="h-4 flex items-center justify-start text-[8.5px] font-mono font-medium text-slate-400">
-                      {hoveredDay?.habitId === habit.id ? (
-                        <span className="bg-slate-100 dark:bg-emerald-950/20 px-2 py-0.5 rounded border border-slate-200/50 dark:border-emerald-900/10 flex items-center gap-1 select-none animate-in fade-in duration-100">
-                          <span className={`w-1 h-1 rounded-full ${hoveredDay.isCompleted ? "bg-emerald-400" : "bg-slate-400"}`} />
-                          {new Date(hoveredDay.date).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'})}
-                          <span className="mx-0.5">•</span>
-                          <span className={hoveredDay.isCompleted ? "text-emerald-400 font-extrabold" : "text-slate-500"}>
-                            {hoveredDay.isCompleted ? "ACHIEVED ✨" : "PENDING 🛡️"}
-                          </span>
-                        </span>
-                      ) : (
-                        <span className="text-[7.5px] italic text-slate-400 select-none">Hover over dots to review calendar completion logs</span>
-                      )}
-                    </div>
+                <div className="space-y-1">
+                  <h3 className="font-display font-black text-xs uppercase tracking-wider">
+                    Reminders &amp; Alerts Status
+                  </h3>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span className="text-[10px] text-slate-400 font-medium">Status:</span>
+                    <span className={`text-[9px] font-mono font-bold uppercase tracking-wider py-0.5 px-2 rounded-md ${
+                      notificationPermission === "granted" 
+                        ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400" 
+                        : "bg-amber-500/10 border border-amber-500/20 text-amber-500"
+                    }`}>
+                      {notificationPermission}
+                    </span>
                   </div>
                 </div>
-              );
-            })
-          )}
-        </div>
-      </div>
+
+                <div className="text-[11px] text-slate-400 leading-normal px-2 text-center font-medium">
+                  {notificationPermission === "granted" ? (
+                    "Excellent! Your browser supports native desktop push alerts. You will receive active 8:00 PM habits reminders and secure telemetry diagnostics automatically."
+                  ) : (
+                    "To send automatic daily wellness logs, habit trackers, and safe security alarms, Atrack requires standard browser push permissions."
+                  )}
+                </div>
+
+                {notificationPermission !== "granted" && (
+                  <div className={`text-[10px] p-3 rounded-2xl border text-left leading-normal font-medium ${
+                    isCircadian 
+                      ? "bg-[#0b1411] border-emerald-950 text-emerald-405" 
+                      : "bg-indigo-50/50 border-indigo-100 text-indigo-700"
+                  }`} id="notif-modal-help-tip">
+                    ℹ️ **Important:** Because Atrack is loaded inside a sandboxed iframe, your browser blocks permission requests by default. Open the app in a **new tab** to grant permissions safely!
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 mt-5" id="notif-modal-actions">
+                <button
+                  onClick={() => setShowNotificationModal(false)}
+                  className={`flex-1 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border text-center cursor-pointer ${
+                    isCircadian 
+                      ? "bg-transparent hover:bg-emerald-950/20 border-emerald-900/40 text-emerald-400" 
+                      : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600"
+                  }`}
+                  id="btn-dismiss-notif"
+                >
+                  Close
+                </button>
+                
+                {notificationPermission !== "granted" ? (
+                  <a
+                    href={window.location.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setShowNotificationModal(false)}
+                    className={`flex-1 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all text-center cursor-pointer flex items-center justify-center ${
+                      isCircadian 
+                        ? "bg-emerald-500 hover:bg-emerald-400 text-emerald-955" 
+                        : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                    }`}
+                    id="btn-tab-notif"
+                  >
+                    Open in New Tab
+                  </a>
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (typeof window !== "undefined" && "Notification" in window) {
+                        try {
+                          new Notification("Atrack reminders Active", {
+                            body: "Atrack push notification alerts are locked and ready!",
+                            icon: "/favicon.ico"
+                          });
+                        } catch (e) {
+                          console.error("Native notification constructor call failed:", e);
+                        }
+                      }
+                    }}
+                    className={`flex-1 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all text-center cursor-pointer ${
+                      isCircadian 
+                        ? "bg-emerald-500 hover:bg-emerald-400 text-emerald-955" 
+                        : "bg-indigo-600 hover:bg-indigo-700 text-white"
+                    }`}
+                    id="btn-test-notif"
+                  >
+                    Send Test Alert
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
-};
+}
