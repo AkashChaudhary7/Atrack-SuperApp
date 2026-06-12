@@ -1,0 +1,258 @@
+{
+  "entities": {
+    "Expense": {
+      "title": "Expense",
+      "description": "Represents a single expense logged by the user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "category": { "type": "string" },
+        "description": { "type": "string" },
+        "date": { "type": "string" },
+        "assetAccountId": { "type": "string" }
+      },
+      "required": ["id", "userId", "amount", "category", "description", "date"]
+    },
+    "AssetAccount": {
+      "title": "AssetAccount",
+      "description": "Financial accounts mapping available balance resources.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string" },
+        "category": { "type": "string" },
+        "balance": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "name", "type", "category", "balance", "updatedAt"]
+    },
+    "Bill": {
+      "title": "Bill",
+      "description": "Incoming bill and EMIs with category breakdown.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "amount": { "type": "number" },
+        "dueDate": { "type": "string" },
+        "category": { "type": "string" },
+        "isPaid": { "type": "boolean" },
+        "reminderDays": { "type": "number" }
+      },
+      "required": ["id", "userId", "title", "amount", "dueDate", "category", "isPaid", "reminderDays"]
+    },
+    "Habit": {
+      "title": "Habit",
+      "description": "Habit and completing triggers.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "completedDates": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "streak": { "type": "number" }
+      },
+      "required": ["id", "userId", "name", "completedDates", "createdAt", "streak"]
+    },
+    "IntimacyLog": {
+      "title": "IntimacyLog",
+      "description": "Track private physical intimacy logs.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "partnerName": { "type": "string" },
+        "date": { "type": "string" },
+        "mood": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "userId", "partnerName", "date", "mood"]
+    },
+    "JerkOffLog": {
+      "title": "JerkOffLog",
+      "description": "Confidential individual session count logger.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "count": { "type": "number" },
+        "sessions": { "type": "number" }
+      },
+      "required": ["id", "userId", "date", "count", "sessions"]
+    },
+    "Medicine": {
+      "title": "Medicine",
+      "description": "Logs and tracking schedules of medicine doses.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "dosageDaily": { "type": "number" },
+        "totalPillsLeft": { "type": "number" },
+        "reminderTime": { "type": "string" },
+        "history": { "type": "object" }
+      },
+      "required": ["id", "userId", "name", "dosageDaily", "totalPillsLeft", "reminderTime", "history"]
+    },
+    "WeightRecord": {
+      "title": "WeightRecord",
+      "description": "Daily weight tracking records.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "weight": { "type": "number" }
+      },
+      "required": ["id", "userId", "date", "weight"]
+    },
+    "WorkoutLog": {
+      "title": "WorkoutLog",
+      "description": "Workout counts for Squats and Kegels.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "reps": { "type": "number" },
+        "sets": { "type": "number" },
+        "date": { "type": "string" }
+      },
+      "required": ["id", "userId", "type", "reps", "sets", "date"]
+    },
+    "PlannerTask": {
+      "title": "PlannerTask",
+      "description": "General task categories and status.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "isCompleted": { "type": "boolean" },
+        "type": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "date", "isCompleted", "type"]
+    },
+    "StudyFocusSession": {
+      "title": "StudyFocusSession",
+      "description": "Concentration/pomodoro focus timer metrics.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "durationMinutes": { "type": "number" },
+        "subject": { "type": "string" }
+      },
+      "required": ["id", "userId", "date", "durationMinutes", "subject"]
+    },
+    "SecurePassword": {
+      "title": "SecurePassword",
+      "description": "Secure passwords vault items.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "username": { "type": "string" },
+        "passwordEncrypted": { "type": "string" },
+        "url": { "type": "string" },
+        "notes": { "type": "string" },
+        "category": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "username", "passwordEncrypted", "category"]
+    },
+    "SecureDocument": {
+      "title": "SecureDocument",
+      "description": "Private encrypted documentation mapping details.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "profileId": { "type": "string" },
+        "title": { "type": "string" },
+        "fileName": { "type": "string" },
+        "uploadedAt": { "type": "string" },
+        "fileDataEncrypted": { "type": "string" }
+      },
+      "required": ["id", "userId", "profileId", "title", "fileName", "uploadedAt", "fileDataEncrypted"]
+    },
+    "PersonalID": {
+      "title": "PersonalID",
+      "description": "Secure identities mapping driver licences, passport records, etc.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "idType": { "type": "string" },
+        "idNumber": { "type": "string" },
+        "nameOnID": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "userId", "idType", "idNumber", "nameOnID"]
+    },
+    "Goal": {
+      "title": "Goal",
+      "description": "Financial goals and metrics logs.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "profileId": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "targetValue": { "type": "number" },
+        "currentValue": { "type": "number" },
+        "unit": { "type": "string" },
+        "targetDate": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "milestones": { "type": "array" }
+      },
+      "required": ["id", "userId", "title", "category", "targetValue", "currentValue", "unit", "targetDate", "createdAt", "updatedAt", "milestones"]
+    },
+    "SleepLog": {
+      "title": "SleepLog",
+      "description": "Circadian rest and efficiency logs mapping user energy cycles.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "sleepDuration": { "type": "number" },
+        "sleepScore": { "type": "number" },
+        "wakeUpTime": { "type": "string" },
+        "energyLevel": { "type": "number" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "userId", "date", "sleepDuration", "sleepScore", "wakeUpTime", "energyLevel"]
+    }
+  },
+  "firestore": {
+    "expenses": { "schema": "#/entities/Expense", "description": "Flat list of user expenses." },
+    "assetAccounts": { "schema": "#/entities/AssetAccount", "description": "User liquid and fixed accounts balance." },
+    "bills": { "schema": "#/entities/Bill", "description": "User EMI and bills records." },
+    "habits": { "schema": "#/entities/Habit", "description": "Daily user habits." },
+    "intimacyLogs": { "schema": "#/entities/IntimacyLog", "description": "Sensitive intimacy event tracking." },
+    "jerkOffLogs": { "schema": "#/entities/JerkOffLog", "description": "Jerk logs counts." },
+    "medicines": { "schema": "#/entities/Medicine", "description": "Dedicaton and pills tracking." },
+    "weightRecords": { "schema": "#/entities/WeightRecord", "description": "Body mass indices logs." },
+    "workouts": { "schema": "#/entities/WorkoutLog", "description": "Isometric squat & kegel counts." },
+    "tasks": { "schema": "#/entities/PlannerTask", "description": "Day-to-day agenda tasks." },
+    "studySessions": { "schema": "#/entities/StudyFocusSession", "description": "Detailed focus session track." },
+    "passwords": { "schema": "#/entities/SecurePassword", "description": "Encrypted digital safes." },
+    "documents": { "schema": "#/entities/SecureDocument", "description": "Encrypted uploaded identity scanned docs." },
+    "personalIDs": { "schema": "#/entities/PersonalID", "description": "User ID numbers vault." },
+    "goals": { "schema": "#/entities/Goal", "description": "Goals and milestones." },
+    "sleepLogs": { "schema": "#/entities/SleepLog", "description": "User resting and wake rhythm tracking." }
+  }
+}

@@ -1,0 +1,330 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // --- GLOBAL SAFETY DEFAULT ---
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- GLOBAL HELPERS ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // --- VALIDATION BLUEPRINTS ---
+
+    function isValidExpense(data) {
+      return 'id' in data && data.id is string && data.id.size() <= 128
+        && 'userId' in data && data.userId == request.auth.uid
+        && 'amount' in data && data.amount is number
+        && 'category' in data && data.category is string && data.category.size() <= 100
+        && 'description' in data && data.description is string && data.description.size() <= 500
+        && 'date' in data && data.date is string && data.date.size() <= 30
+        && (!('assetAccountId' in data) || (data.assetAccountId is string && data.assetAccountId.size() <= 128));
+    }
+
+    function isValidAssetAccount(data) {
+      return 'id' in data && data.id is string && data.id.size() <= 128
+        && 'userId' in data && data.userId == request.auth.uid
+        && 'name' in data && data.name is string && data.name.size() <= 100
+        && 'type' in data && data.type is string && data.type.size() <= 50
+        && 'category' in data && data.category is string && data.category.size() <= 100
+        && 'balance' in data && data.balance is number
+        && 'updatedAt' in data && data.updatedAt is string && data.updatedAt.size() <= 50;
+    }
+
+    function isValidBill(data) {
+      return 'id' in data && data.id is string && data.id.size() <= 128
+        && 'userId' in data && data.userId == request.auth.uid
+        && 'title' in data && data.title is string && data.title.size() <= 150
+        && 'amount' in data && data.amount is number
+        && 'dueDate' in data && data.dueDate is string && data.dueDate.size() <= 30
+        && 'category' in data && data.category is string && data.category.size() <= 100
+        && 'isPaid' in data && data.isPaid is bool
+        && 'reminderDays' in data && data.reminderDays is number;
+    }
+
+    function isValidHabit(data) {
+      return 'id' in data && data.id is string && data.id.size() <= 128
+        && 'userId' in data && data.userId == request.auth.uid
+        && 'name' in data && data.name is string && data.name.size() <= 150
+        && 'completedDates' in data && data.completedDates is list
+        && 'createdAt' in data && data.createdAt is string && data.createdAt.size() <= 50
+        && 'streak' in data && data.streak is number;
+    }
+
+    function isValidIntimacyLog(data) {
+      return 'id' in data && data.id is string && data.id.size() <= 128
+        && 'userId' in data && data.userId == request.auth.uid
+        && 'partnerName' in data && data.partnerName is string && data.partnerName.size() <= 150
+        && 'date' in data && data.date is string && data.date.size() <= 30
+        && 'mood' in data && data.mood is string && data.mood.size() <= 50
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000));
+    }
+
+    function isValidJerkOffLog(data) {
+      return 'id' in data && data.id is string && data.id.size() <= 128
+        && 'userId' in data && data.userId == request.auth.uid
+        && 'date' in data && data.date is string && data.date.size() <= 30
+        && 'count' in data && data.count is number
+        && 'sessions' in data && data.sessions is number;
+    }
+
+    function isValidMedicine(data) {
+      return 'id' in data && data.id is string && data.id.size() <= 128
+        && 'userId' in data && data.userId == request.auth.uid
+        && 'name' in data && data.name is string && data.name.size() <= 150
+        && 'dosageDaily' in data && data.dosageDaily is number
+        && 'totalPillsLeft' in data && data.totalPillsLeft is number
+        && 'reminderTime' in data && data.reminderTime is string && data.reminderTime.size() <= 30
+        && 'history' in data && data.history is map;
+    }
+
+    function isValidWeightRecord(data) {
+      return 'id' in data && data.id is string && data.id.size() <= 128
+        && 'userId' in data && data.userId == request.auth.uid
+        && 'date' in data && data.date is string && data.date.size() <= 30
+        && 'weight' in data && data.weight is number;
+    }
+
+    function isValidWorkout(data) {
+      return 'id' in data && data.id is string && data.id.size() <= 128
+        && 'userId' in data && data.userId == request.auth.uid
+        && 'type' in data && data.type is string && data.type.size() <= 50
+        && 'reps' in data && data.reps is number
+        && 'sets' in data && data.sets is number
+        && 'date' in data && data.date is string && data.date.size() <= 30
+        && (!('weight' in data) || data.weight is number);
+    }
+
+    function isValidTask(data) {
+      return 'id' in data && data.id is string && data.id.size() <= 128
+        && 'userId' in data && data.userId == request.auth.uid
+        && 'title' in data && data.title is string && data.title.size() <= 200
+        && 'date' in data && data.date is string && data.date.size() <= 30
+        && 'isCompleted' in data && data.isCompleted is bool
+        && 'type' in data && data.type is string && data.type.size() <= 100;
+    }
+
+    function isValidStudySession(data) {
+      return 'id' in data && data.id is string && data.id.size() <= 128
+        && 'userId' in data && data.userId == request.auth.uid
+        && 'date' in data && data.date is string && data.date.size() <= 30
+        && 'durationMinutes' in data && data.durationMinutes is number
+        && 'subject' in data && data.subject is string && data.subject.size() <= 150;
+    }
+
+    function isValidPassword(data) {
+      return 'id' in data && data.id is string && data.id.size() <= 128
+        && 'userId' in data && data.userId == request.auth.uid
+        && 'title' in data && data.title is string && data.title.size() <= 200
+        && 'username' in data && data.username is string && data.username.size() <= 200
+        && 'passwordEncrypted' in data && data.passwordEncrypted is string && data.passwordEncrypted.size() <= 5000
+        && 'category' in data && data.category is string && data.category.size() <= 100
+        && (!('url' in data) || (data.url is string && data.url.size() <= 500))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000));
+    }
+
+    function isValidDocument(data) {
+      return 'id' in data && data.id is string && data.id.size() <= 128
+        && 'userId' in data && data.userId == request.auth.uid
+        && 'profileId' in data && data.profileId is string && data.profileId.size() <= 128
+        && 'title' in data && data.title is string && data.title.size() <= 200
+        && 'fileName' in data && data.fileName is string && data.fileName.size() <= 200
+        && 'uploadedAt' in data && data.uploadedAt is string && data.uploadedAt.size() <= 50
+        && 'fileDataEncrypted' in data && data.fileDataEncrypted is string && data.fileDataEncrypted.size() <= 10000000;
+    }
+
+    function isValidPersonalID(data) {
+      return 'id' in data && data.id is string && data.id.size() <= 128
+        && 'userId' in data && data.userId == request.auth.uid
+        && 'idType' in data && data.idType is string && data.idType.size() <= 128
+        && 'idNumber' in data && data.idNumber is string && data.idNumber.size() <= 128
+        && 'nameOnID' in data && data.nameOnID is string && data.nameOnID.size() <= 200
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000));
+    }
+
+    function isValidGoal(data) {
+      return 'id' in data && data.id is string && data.id.size() <= 128
+        && 'userId' in data && data.userId == request.auth.uid
+        && 'title' in data && data.title is string && data.title.size() <= 200
+        && 'category' in data && data.category is string && data.category.size() <= 100
+        && 'targetValue' in data && data.targetValue is number
+        && 'currentValue' in data && data.currentValue is number
+        && 'unit' in data && data.unit is string && data.unit.size() <= 50
+        && 'targetDate' in data && data.targetDate is string && data.targetDate.size() <= 100
+        && 'createdAt' in data && data.createdAt is string && data.createdAt.size() <= 100
+        && 'updatedAt' in data && data.updatedAt is string && data.updatedAt.size() <= 100
+        && 'milestones' in data && data.milestones is list
+        && (!('profileId' in data) || (data.profileId is string && data.profileId.size() <= 128));
+    }
+
+    function isValidSleepLog(data) {
+      return 'id' in data && data.id is string && data.id.size() <= 128
+        && 'userId' in data && data.userId == request.auth.uid
+        && 'date' in data && data.date is string && data.date.size() <= 30
+        && 'sleepDuration' in data && data.sleepDuration is number
+        && 'sleepScore' in data && data.sleepScore is number
+        && 'wakeUpTime' in data && data.wakeUpTime is string && data.wakeUpTime.size() <= 10
+        && 'energyLevel' in data && data.energyLevel is number
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000));
+    }
+
+
+    // --- MATCH BLOCK GROUPS FOR ALL 15 COLLECTIONS ---
+
+    // 1. EXPENSES
+    match /expenses/{expenseId} {
+      allow get: if isVerifiedUser() && isValidId(expenseId) && resource.data.userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(expenseId) && isValidExpense(request.resource.data);
+      allow update: if isVerifiedUser() && isValidId(expenseId) && resource.data.userId == request.auth.uid && isValidExpense(request.resource.data);
+      allow delete: if isVerifiedUser() && isValidId(expenseId) && resource.data.userId == request.auth.uid;
+    }
+
+    // 2. ASSET ACCOUNTS
+    match /assetAccounts/{accountId} {
+      allow get: if isVerifiedUser() && isValidId(accountId) && resource.data.userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(accountId) && isValidAssetAccount(request.resource.data);
+      allow update: if isVerifiedUser() && isValidId(accountId) && resource.data.userId == request.auth.uid && isValidAssetAccount(request.resource.data);
+      allow delete: if isVerifiedUser() && isValidId(accountId) && resource.data.userId == request.auth.uid;
+    }
+
+    // 3. BILLS
+    match /bills/{billId} {
+      allow get: if isVerifiedUser() && isValidId(billId) && resource.data.userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(billId) && isValidBill(request.resource.data);
+      allow update: if isVerifiedUser() && isValidId(billId) && resource.data.userId == request.auth.uid && isValidBill(request.resource.data);
+      allow delete: if isVerifiedUser() && isValidId(billId) && resource.data.userId == request.auth.uid;
+    }
+
+    // 4. HABITS
+    match /habits/{habitId} {
+      allow get: if isVerifiedUser() && isValidId(habitId) && resource.data.userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(habitId) && isValidHabit(request.resource.data);
+      allow update: if isVerifiedUser() && isValidId(habitId) && resource.data.userId == request.auth.uid && isValidHabit(request.resource.data);
+      allow delete: if isVerifiedUser() && isValidId(habitId) && resource.data.userId == request.auth.uid;
+    }
+
+    // 5. INTIMACY LOGS
+    match /intimacyLogs/{logId} {
+      allow get: if isVerifiedUser() && isValidId(logId) && resource.data.userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(logId) && isValidIntimacyLog(request.resource.data);
+      allow update: if isVerifiedUser() && isValidId(logId) && resource.data.userId == request.auth.uid && isValidIntimacyLog(request.resource.data);
+      allow delete: if isVerifiedUser() && isValidId(logId) && resource.data.userId == request.auth.uid;
+    }
+
+    // 6. JERK OFF LOGS
+    match /jerkOffLogs/{logId} {
+      allow get: if isVerifiedUser() && isValidId(logId) && resource.data.userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(logId) && isValidJerkOffLog(request.resource.data);
+      allow update: if isVerifiedUser() && isValidId(logId) && resource.data.userId == request.auth.uid && isValidJerkOffLog(request.resource.data);
+      allow delete: if isVerifiedUser() && isValidId(logId) && resource.data.userId == request.auth.uid;
+    }
+
+    // 7. MEDICINES
+    match /medicines/{medId} {
+      allow get: if isVerifiedUser() && isValidId(medId) && resource.data.userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(medId) && isValidMedicine(request.resource.data);
+      allow update: if isVerifiedUser() && isValidId(medId) && resource.data.userId == request.auth.uid && isValidMedicine(request.resource.data);
+      allow delete: if isVerifiedUser() && isValidId(medId) && resource.data.userId == request.auth.uid;
+    }
+
+    // 8. WEIGHT RECORDS
+    match /weightRecords/{weightId} {
+      allow get: if isVerifiedUser() && isValidId(weightId) && resource.data.userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(weightId) && isValidWeightRecord(request.resource.data);
+      allow update: if isVerifiedUser() && isValidId(weightId) && resource.data.userId == request.auth.uid && isValidWeightRecord(request.resource.data);
+      allow delete: if isVerifiedUser() && isValidId(weightId) && resource.data.userId == request.auth.uid;
+    }
+
+    // 9. WORKOUTS (WorkoutLog)
+    match /workouts/{workoutId} {
+      allow get: if isVerifiedUser() && isValidId(workoutId) && resource.data.userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(workoutId) && isValidWorkout(request.resource.data);
+      allow update: if isVerifiedUser() && isValidId(workoutId) && resource.data.userId == request.auth.uid && isValidWorkout(request.resource.data);
+      allow delete: if isVerifiedUser() && isValidId(workoutId) && resource.data.userId == request.auth.uid;
+    }
+
+    // 10. TASKS (PlannerTask)
+    match /tasks/{taskId} {
+      allow get: if isVerifiedUser() && isValidId(taskId) && resource.data.userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(taskId) && isValidTask(request.resource.data);
+      allow update: if isVerifiedUser() && isValidId(taskId) && resource.data.userId == request.auth.uid && isValidTask(request.resource.data);
+      allow delete: if isVerifiedUser() && isValidId(taskId) && resource.data.userId == request.auth.uid;
+    }
+
+    // 11. STUDY SESSIONS (StudyFocusSession)
+    match /studySessions/{sessionId} {
+      allow get: if isVerifiedUser() && isValidId(sessionId) && resource.data.userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(sessionId) && isValidStudySession(request.resource.data);
+      allow update: if isVerifiedUser() && isValidId(sessionId) && resource.data.userId == request.auth.uid && isValidStudySession(request.resource.data);
+      allow delete: if isVerifiedUser() && isValidId(sessionId) && resource.data.userId == request.auth.uid;
+    }
+
+    // 12. PASSWORDS (SecurePassword)
+    match /passwords/{passwordId} {
+      allow get: if isVerifiedUser() && isValidId(passwordId) && resource.data.userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(passwordId) && isValidPassword(request.resource.data);
+      allow update: if isVerifiedUser() && isValidId(passwordId) && resource.data.userId == request.auth.uid && isValidPassword(request.resource.data);
+      allow delete: if isVerifiedUser() && isValidId(passwordId) && resource.data.userId == request.auth.uid;
+    }
+
+    // 13. DOCUMENTS (SecureDocument)
+    match /documents/{docId} {
+      allow get: if isVerifiedUser() && isValidId(docId) && resource.data.userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(docId) && isValidDocument(request.resource.data);
+      allow update: if isVerifiedUser() && isValidId(docId) && resource.data.userId == request.auth.uid && isValidDocument(request.resource.data);
+      allow delete: if isVerifiedUser() && isValidId(docId) && resource.data.userId == request.auth.uid;
+    }
+
+    // 14. PERSONAL IDS (PersonalID)
+    match /personalIDs/{pdId} {
+      allow get: if isVerifiedUser() && isValidId(pdId) && resource.data.userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(pdId) && isValidPersonalID(request.resource.data);
+      allow update: if isVerifiedUser() && isValidId(pdId) && resource.data.userId == request.auth.uid && isValidPersonalID(request.resource.data);
+      allow delete: if isVerifiedUser() && isValidId(pdId) && resource.data.userId == request.auth.uid;
+    }
+
+    // 15. GOALS (Goal)
+    match /goals/{goalId} {
+      allow get: if isVerifiedUser() && isValidId(goalId) && resource.data.userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(goalId) && isValidGoal(request.resource.data);
+      allow update: if isVerifiedUser() && isValidId(goalId) && resource.data.userId == request.auth.uid && isValidGoal(request.resource.data);
+      allow delete: if isVerifiedUser() && isValidId(goalId) && resource.data.userId == request.auth.uid;
+    }
+
+    // 16. SLEEP LOGS (SleepLog)
+    match /sleepLogs/{sleepId} {
+      allow get: if isVerifiedUser() && isValidId(sleepId) && resource.data.userId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.userId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(sleepId) && isValidSleepLog(request.resource.data);
+      allow update: if isVerifiedUser() && isValidId(sleepId) && resource.data.userId == request.auth.uid && isValidSleepLog(request.resource.data);
+      allow delete: if isVerifiedUser() && isValidId(sleepId) && resource.data.userId == request.auth.uid;
+    }
+
+  }
+}
