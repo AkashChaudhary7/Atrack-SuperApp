@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from "react";
+import { Analytics } from '@vercel/analytics/react';
 import { useApp } from "./AppContext";
 import { LockScreen } from "./components/LockScreen";
 import { DashboardTab } from "./components/DashboardTab";
@@ -215,6 +216,7 @@ export default function App() {
           <span className="text-[9px] font-bold">Safe</span>
         </button>
       </nav>
+      <Analytics />
     </div>
   );
 }
