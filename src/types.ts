@@ -9,6 +9,7 @@ export interface UserState {
   biometricActive: boolean;
   profiles: string[]; // ["Self", "Wife", "Other"]
   currentProfile: string;
+  lockPassword?: string;
 }
 
 export interface Expense {
@@ -99,6 +100,7 @@ export interface StudyFocusSession {
   date: string;
   durationMinutes: number; // minutes focused
   subject: string;
+  startTime?: string;      // Recorded start time
 }
 
 export interface SecurePassword {
