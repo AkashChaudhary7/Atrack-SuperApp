@@ -150,7 +150,9 @@ service cloud.firestore {
         && 'idType' in data && data.idType is string && data.idType.size() <= 128
         && 'idNumber' in data && data.idNumber is string && data.idNumber.size() <= 128
         && 'nameOnID' in data && data.nameOnID is string && data.nameOnID.size() <= 200
-        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000));
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000))
+        && (!('folderName' in data) || (data.folderName is string && data.folderName.size() <= 200))
+        && (!('idPhoto' in data) || (data.idPhoto is string && data.idPhoto.size() <= 10000000));
     }
 
     function isValidGoal(data) {
