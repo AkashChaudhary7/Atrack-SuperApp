@@ -134,6 +134,8 @@ export interface PersonalID {
   idNumber: string;
   nameOnID: string;
   notes?: string;
+  folderName?: string;
+  idPhoto?: string;
 }
 
 export interface Milestone {
