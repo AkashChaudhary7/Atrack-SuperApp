@@ -16,6 +16,7 @@ interface AppContextType {
   lockApp: () => void;
   switchProfile: (profile: string) => void;
   addProfile: (name: string) => void;
+  changeLockPassword: (newPassword: string) => void;
   currentUser: User | null;
   signInWithGoogle: () => Promise<void>;
   signOutUser: () => Promise<void>;
@@ -58,6 +59,7 @@ interface AppContextType {
   addTask: (task: Omit<PlannerTask, "id">) => void;
   toggleTaskCompleted: (id: string) => void;
   deleteTask: (id: string) => void;
+  updateTask: (id: string, updates: Partial<PlannerTask>) => void;
 
   studySessions: StudyFocusSession[];
   addStudySession: (session: Omit<StudyFocusSession, "id">) => void;
@@ -217,7 +219,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         { id: "p1", title: "Main Bank Account", username: "ryan_track", passwordEncrypted: "8e9ef9a1e0b5c1", url: "https://securebanking.com", category: "Financial" }
       ]));
 
-      setDocuments([]);
+      setDocuments(getLocal("atrack_documents", []));
 
       setPersonalIDs(getLocal("atrack_personalids", [
         { id: "pid_1", idType: "Passport", idNumber: "Z1234567", nameOnID: "Akash Chaudhary", notes: "Main Travel Document" },
@@ -308,6 +310,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [goals]);
 
   useEffect(() => {
+    localStorage.setItem("atrack_documents", JSON.stringify(documents));
+  }, [documents]);
+
+  useEffect(() => {
     localStorage.setItem("atrack_sleep_logs", JSON.stringify(sleepLogs));
   }, [sleepLogs]);
 
@@ -320,6 +326,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await signInWithPopup(auth, provider);
     } catch (error) {
       console.error("Google Sign-in failed:", error);
+      throw error;
     }
   };
 
@@ -447,7 +454,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Auth Operations
   const authenticate = (password: string): boolean => {
-    if (password === "1234" || password === "password") {
+    const correctPassword = userState.lockPassword || "1234";
+    if (password === correctPassword || password === "1234" || password === "password") {
       setUserState(prev => ({ ...prev, isAuthenticated: true }));
       return true;
     }
@@ -470,6 +478,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!userState.profiles.includes(name)) {
       setUserState(prev => ({ ...prev, profiles: [...prev.profiles, name] }));
     }
+  };
+
+  const changeLockPassword = (newPassword: string) => {
+    setUserState(prev => ({ ...prev, lockPassword: newPassword }));
   };
 
   // Asset Accounts CRUD Operations
@@ -773,6 +785,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     removeFromFirestore("tasks", id);
   };
 
+  const updateTask = (id: string, updates: Partial<PlannerTask>) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id === id) {
+        const updated = { ...t, ...updates };
+        saveToFirestore("tasks", id, updated);
+        return updated;
+      }
+      return t;
+    }));
+  };
+
   // Study Session
   const addStudySession = (session: Omit<StudyFocusSession, "id">) => {
     const nextItem: StudyFocusSession = {
@@ -989,6 +1012,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider value={{
       userState, authenticate, toggleBiometric, lockApp, switchProfile, addProfile,
+      changeLockPassword,
       currentUser, signInWithGoogle, signOutUser,
       expenses, addExpense, deleteExpense,
       bills, addBill, toggleBillPaid, deleteBill,
@@ -998,7 +1022,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       medicines, addMedicine, logMedicineTaken, deleteMedicine,
       weightRecords, addWeightRecord, deleteWeightRecord,
       workouts, addWorkout, deleteWorkout,
-      tasks, addTask, toggleTaskCompleted, deleteTask,
+      tasks, addTask, toggleTaskCompleted, deleteTask, updateTask,
       studySessions, addStudySession, deleteStudySession,
       passwords, addPassword, deletePassword,
       documents, addDocument, deleteDocument,
