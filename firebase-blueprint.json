@@ -188,7 +188,7 @@
     },
     "PersonalID": {
       "title": "PersonalID",
-      "description": "Secure identities mapping driver licences, passport records, etc.",
+      "description": "Secure identities mapping driver licences, passport records, etc. supporting folders and photos.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -196,7 +196,9 @@
         "idType": { "type": "string" },
         "idNumber": { "type": "string" },
         "nameOnID": { "type": "string" },
-        "notes": { "type": "string" }
+        "notes": { "type": "string" },
+        "folderName": { "type": "string" },
+        "idPhoto": { "type": "string" }
       },
       "required": ["id", "userId", "idType", "idNumber", "nameOnID"]
     },
