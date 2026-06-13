@@ -202,7 +202,7 @@ export const DashboardTab: React.FC<{ setActiveTab: (tab: string) => void }> = (
               <span className={`text-[9px] font-mono tracking-widest font-bold uppercase ${isCircadian ? "text-emerald-500" : "text-indigo-300"}`}>Biometric Protected</span>
             </div>
             <h2 className="text-lg font-black tracking-tight mt-0.5 font-display">
-              <span className={isCircadian ? "text-emerald-400 font-extrabold" : "bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-indigo-200 font-extrabold"}>Hi,Akash Chaudhary</span>
+              <span className={isCircadian ? "text-emerald-400 font-extrabold" : "bg-clip-text text-transparent bg-gradient-to-r from-white via-slate-100 to-indigo-200 font-extrabold"}>Akash Chaudhary</span>
             </h2>
           </div>
 
@@ -270,7 +270,7 @@ export const DashboardTab: React.FC<{ setActiveTab: (tab: string) => void }> = (
             <h3 className={`text-xs font-mono font-black uppercase tracking-wider ${
               isCircadian ? "text-emerald-400" : "text-slate-800"
             }`}>
-              Tasks &amp; Reminders
+              Pending Tasks &amp; Reminders Board
             </h3>
           </div>
           <span className={`text-[8.5px] font-mono font-black px-2 py-0.5 rounded border uppercase transition-colors ${
@@ -278,11 +278,15 @@ export const DashboardTab: React.FC<{ setActiveTab: (tab: string) => void }> = (
               ? "bg-emerald-950/20 border-emerald-900/30 text-emerald-400" 
               : "bg-slate-50 border-slate-200 text-slate-500"
           }`}>
-            Priority
+            Priority Pipeline
           </span>
         </div>
 
-        <div className="space-y-2 max-h-60 overflow-y-auto pr-0.5">
+        <p className="text-[10px] text-slate-400 font-semibold leading-normal">
+          Unfinished requirements across all planner modules, active medication schedules, custom objectives, EMI payments, and workouts.
+        </p>
+
+        <div className="space-y-2">
           {/* 1. Custom To-Do planner lists */}
           {tasks.filter(t => !t.isCompleted).length === 0 && 
            bills.filter(b => !b.isPaid).length === 0 && 
@@ -298,7 +302,7 @@ export const DashboardTab: React.FC<{ setActiveTab: (tab: string) => void }> = (
                     ? "bg-[#0f1d18] border-emerald-950/80 text-emerald-400" 
                     : "bg-indigo-50/50 border-indigo-100 text-indigo-600"
                 }`}>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <div className={`absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm ${
@@ -313,9 +317,11 @@ export const DashboardTab: React.FC<{ setActiveTab: (tab: string) => void }> = (
                 <h4 className={`text-sm font-black tracking-tight ${
                   isCircadian ? "text-emerald-300" : "text-slate-800"
                 }`}>
-                  No Task
+                  Your Pipeline is Clear
                 </h4>
-               
+                <p className="text-[11px] text-slate-400 leading-normal font-medium">
+                  Outstanding work! All pending tasks, active medication schedules, custom objectives, and bills are fully cleared and balanced.
+                </p>
               </div>
 
               <button
@@ -334,24 +340,38 @@ export const DashboardTab: React.FC<{ setActiveTab: (tab: string) => void }> = (
             <>
               {/* Custom To-Dos */}
               {tasks.filter(t => !t.isCompleted).map(t => (
-                <div key={t.id} className="flex items-center justify-between p-2.5 bg-slate-50/50 dark:bg-emerald-950/10 border border-slate-100 dark:border-emerald-950/30 rounded-xl hover:border-slate-200">
+                <div key={t.id} className={`flex items-center justify-between p-2.5 border rounded-xl transition-all ${
+                  isCircadian 
+                    ? "bg-emerald-950/20 border-emerald-900/30 hover:border-emerald-800" 
+                    : "bg-slate-50/50 border-slate-100 hover:border-slate-200"
+                }`}>
                   <div className="flex items-center gap-2.5">
                     <button 
                       onClick={() => {
                         toggleTaskCompleted(t.id);
                         setSuccessMessage(`Checked off "${t.title}"! ✅`);
                       }}
-                      className="w-4.5 h-4.5 rounded-full border border-slate-300 hover:border-indigo-500 flex items-center justify-center shrink-0 cursor-pointer text-transparent hover:text-indigo-500 bg-white"
+                      className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center shrink-0 cursor-pointer text-transparent transition-colors ${
+                        isCircadian
+                          ? "bg-emerald-950/80 border-emerald-800 hover:border-emerald-500 hover:text-emerald-400"
+                          : "bg-white border-slate-300 hover:border-indigo-500 hover:text-indigo-500"
+                      }`}
                     >
                       <Check className="w-3 h-3" />
                     </button>
                     <div>
-                      <span className="text-[11.5px] font-bold text-slate-800 dark:text-slate-200">{t.title}</span>
+                      <span className={`text-[11.5px] font-bold ${
+                        isCircadian ? "text-emerald-100" : "text-slate-800"
+                      }`}>{t.title}</span>
                       <div className="flex gap-1.5 items-center mt-0.5">
-                        <span className="text-[7.5px] font-mono font-black uppercase px-1 bg-indigo-50 dark:bg-emerald-950 text-[#4f46e5] dark:text-emerald-450 rounded border">
+                        <span className={`text-[7.5px] font-mono font-black uppercase px-1 rounded border ${
+                          isCircadian
+                            ? "bg-emerald-950 text-emerald-400 border-emerald-900"
+                            : "bg-indigo-50 text-[#4f46e5] border-indigo-100"
+                        }`}>
                           {t.type} Task
                         </span>
-                        <span className="text-[7.5px] font-mono text-slate-400 font-bold">{t.date}</span>
+                        <span className="text-[7.5px] font-mono text-slate-450 font-bold">{t.date}</span>
                       </div>
                     </div>
                   </div>
@@ -361,24 +381,38 @@ export const DashboardTab: React.FC<{ setActiveTab: (tab: string) => void }> = (
 
               {/* Unpaid Bills / EMI */}
               {bills.filter(b => !b.isPaid).map(b => (
-                <div key={b.id} className="flex items-center justify-between p-2.5 bg-rose-50/30 dark:bg-rose-950/5 border border-rose-100/50 dark:border-rose-950/20 rounded-xl hover:border-rose-250">
+                <div key={b.id} className={`flex items-center justify-between p-2.5 border rounded-xl transition-all ${
+                  isCircadian 
+                    ? "bg-red-950/20 border-red-950/30 hover:border-red-900" 
+                    : "bg-rose-50/30 border-rose-100/50 hover:border-rose-250"
+                }`}>
                   <div className="flex items-center gap-2.5">
                     <button 
                       onClick={() => {
                         toggleBillPaid(b.id);
                         setSuccessMessage(`Paid bill "${b.title}"! 💳`);
                       }}
-                      className="w-4.5 h-4.5 rounded-full border border-rose-350 hover:border-rose-500 flex items-center justify-center shrink-0 cursor-pointer text-transparent hover:text-rose-500 bg-white"
+                      className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center shrink-0 cursor-pointer text-transparent transition-colors ${
+                        isCircadian
+                          ? "bg-red-950 border-red-900 hover:border-red-500 hover:text-red-400"
+                          : "bg-white border-rose-350 hover:border-rose-500 hover:text-rose-500"
+                      }`}
                     >
                       <Check className="w-3 h-3" />
                     </button>
                     <div>
-                      <span className="text-[11.5px] font-bold text-slate-850 dark:text-slate-250">{b.title}</span>
+                      <span className={`text-[11.5px] font-bold ${
+                        isCircadian ? "text-rose-100" : "text-slate-800"
+                      }`}>{b.title}</span>
                       <div className="flex gap-1.5 items-center mt-0.5">
-                        <span className="text-[7.5px] font-mono font-black uppercase px-1 bg-rose-50 text-rose-750 rounded border border-rose-200">
+                        <span className={`text-[7.5px] font-mono font-black uppercase px-1 rounded border lg:px-1.5 ${
+                          isCircadian
+                            ? "bg-red-950 text-red-450 border-red-900"
+                            : "bg-rose-50 text-rose-750 border-rose-200"
+                        }`}>
                           ₹{b.amount} due
                         </span>
-                        <span className="text-[7.5px] font-mono text-rose-500 font-bold font-mono">Due: {b.dueDate}</span>
+                        <span className="text-[7.5px] font-mono text-rose-500 font-bold">Due: {b.dueDate}</span>
                       </div>
                     </div>
                   </div>
@@ -388,28 +422,42 @@ export const DashboardTab: React.FC<{ setActiveTab: (tab: string) => void }> = (
 
               {/* Medicines Stock alerts */}
               {medicines.filter(m => m.totalPillsLeft > 0).map(m => (
-                <div key={m.id} className="flex items-center justify-between p-2.5 bg-cyan-50/30 dark:bg-[#070d0a] border border-cyan-150/40 dark:border-emerald-950/30 rounded-xl hover:border-cyan-250">
+                <div key={m.id} className={`flex items-center justify-between p-2.5 border rounded-xl transition-all ${
+                  isCircadian 
+                    ? "bg-cyan-950/20 border-cyan-900/30 hover:border-cyan-800" 
+                    : "bg-cyan-50/30 border-cyan-150/40 hover:border-cyan-250"
+                }`}>
                   <div className="flex items-center gap-2.5">
                     <button 
                       onClick={() => {
                         logMedicineTaken(m.id, todayStr);
                         setSuccessMessage(`Dose taken: ${m.name}! 💊`);
                       }}
-                      className="w-4.5 h-4.5 rounded-full border border-cyan-350 hover:border-cyan-500 flex items-center justify-center shrink-0 cursor-pointer text-transparent hover:text-cyan-500 bg-white"
+                      className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center shrink-0 cursor-pointer text-transparent transition-colors ${
+                        isCircadian
+                          ? "bg-cyan-950 border-cyan-900 hover:border-cyan-500 hover:text-cyan-400"
+                          : "bg-white border-cyan-350 hover:border-cyan-500 hover:text-cyan-500"
+                      }`}
                     >
                       <Check className="w-3 h-3" />
                     </button>
                     <div>
-                      <span className="text-[11.5px] font-bold text-slate-850 dark:text-slate-250">{m.name}</span>
+                      <span className={`text-[11.5px] font-bold ${
+                        isCircadian ? "text-cyan-100" : "text-slate-800"
+                      }`}>{m.name}</span>
                       <div className="flex gap-1.5 items-center mt-0.5">
-                        <span className="text-[7.5px] font-mono font-black uppercase px-1 bg-cyan-50 text-cyan-755 rounded border border-cyan-200">
+                        <span className={`text-[7.5px] font-mono font-black uppercase px-1 rounded border ${
+                          isCircadian
+                            ? "bg-cyan-950 text-cyan-400 border-cyan-900"
+                            : "bg-cyan-50 text-cyan-755 border-cyan-200"
+                        }`}>
                           {m.totalPillsLeft} left
                         </span>
                         <span className="text-[7.5px] font-mono text-cyan-600 font-bold font-mono">Time: {m.reminderTime}</span>
                       </div>
                     </div>
                   </div>
-                  <span className="text-[8px] font-mono font-bold text-cyan-600 uppercase">Medicine Dose</span>
+                  <span className="text-[8px] font-mono font-bold text-cyan-500 uppercase">Medicine Dose</span>
                 </div>
               ))}
             </>
