@@ -13,7 +13,8 @@ export const SafeTab: React.FC = () => {
     documents, addDocument, deleteDocument,
     personalIDs, addPersonalID, deletePersonalID,
     exportData, importData,
-    userState, toggleBiometric, changeLockPassword
+    userState, toggleBiometric, changeLockPassword,
+    isCircadian
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<"passwords" | "ids" | "documents" | "settings">("passwords");
@@ -36,12 +37,31 @@ export const SafeTab: React.FC = () => {
   const [isDragActive, setIsDragActive] = useState(false);
   const fileDropdownRef = useRef<HTMLInputElement>(null);
 
-  // Personal IDs form state
+  // Personal IDs form state & Folders engine
   const [idType, setIdType] = useState("Aadhaar Card");
   const [customIdType, setCustomIdType] = useState("");
   const [idNumber, setIdNumber] = useState("");
   const [nameOnID, setNameOnID] = useState("Akash Chaudhary");
   const [idNotes, setIdNotes] = useState("");
+  
+  // Folders and photos states
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [idPhoto, setIdPhoto] = useState<string | null>(null);
+  const idPhotoInputRef = useRef<HTMLInputElement>(null);
+  const [fullViewPhoto, setFullViewPhoto] = useState<string | null>(null);
+  const [isAddingID, setIsAddingID] = useState(false);
+
+  const [folders, setFolders] = useState<string[]>(() => {
+    const saved = localStorage.getItem("atrack_id_folders");
+    const parsed = saved ? JSON.parse(saved) : ["Akash Chaudhary", "Wife"];
+    const existing = personalIDs.map(p => p.folderName).filter(Boolean) as string[];
+    return Array.from(new Set([...parsed, ...existing]));
+  });
+
+  React.useEffect(() => {
+    localStorage.setItem("atrack_id_folders", JSON.stringify(folders));
+  }, [folders]);
 
   // Lock Screen PIN Changer settings states
   const [newPin, setNewPin] = useState("");
@@ -73,11 +93,15 @@ export const SafeTab: React.FC = () => {
         idType: finalType,
         idNumber: idNumber.trim(),
         nameOnID: nameOnID.trim(),
-        notes: idNotes.trim() || undefined
+        notes: idNotes.trim() || undefined,
+        folderName: selectedFolder || undefined,
+        idPhoto: idPhoto || undefined
       });
       setIdNumber("");
       setIdNotes("");
       setCustomIdType("");
+      setIdPhoto(null);
+      setIsAddingID(false);
     }
   };
 
@@ -432,153 +456,544 @@ export const SafeTab: React.FC = () => {
       {/* 2. Personal ID Cards Tab */}
       {activeTab === "ids" && (
         <div className="space-y-4">
-          <form onSubmit={handleAddCustomID} className="bg-slate-50 border border-slate-150 rounded-2xl p-4 space-y-3 shadow-sm text-sm text-slate-800">
-            <h3 className="font-bold text-slate-700 text-xs flex items-center gap-1.5">
-              <CreditCard className="w-4 h-4 text-cyan-500" />
-              Register Personal Card &amp; Identity details
-            </h3>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[10px] text-slate-500 font-bold block mb-1 uppercase tracking-wider font-mono">ID / Document Type</label>
-                <select 
-                  value={idType}
-                  onChange={(e) => setIdType(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs text-slate-800 focus:outline-none"
-                >
-                  <option value="Aadhaar Card">Aadhaar Card</option>
-                  <option value="PAN Card">PAN Card</option>
-                  <option value="Passport">Passport</option>
-                  <option value="Driver License">Driving License</option>
-                  <option value="Voter ID">Voter ID</option>
-                  <option value="Custom">Custom Label</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[10px] text-slate-500 font-bold block mb-1 uppercase tracking-wider font-mono">Name on Document</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Akash Chaudhary"
-                  value={nameOnID}
-                  onChange={(e) => setNameOnID(e.target.value)}
-                  required
-                  className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-indigo-400"
-                />
-              </div>
-            </div>
-
-            {idType === "Custom" && (
-              <div>
-                <label className="text-[10px] text-slate-500 font-bold block mb-1 uppercase tracking-wider font-mono">Enter Custom ID Name</label>
-                <input 
-                  type="text" 
-                  placeholder="e.g. Employee ID, Gym Membership Code"
-                  value={customIdType}
-                  onChange={(e) => setCustomIdType(e.target.value)}
-                  required
-                  className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none"
-                />
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[10px] text-slate-500 font-bold block mb-1 uppercase tracking-wider font-mono">ID / Card Number</label>
-                <input 
-                  type="text" 
-                  placeholder="Document number..."
-                  value={idNumber}
-                  onChange={(e) => setIdNumber(e.target.value)}
-                  required
-                  className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-indigo-400"
-                />
-              </div>
-
-              <div>
-                <label className="text-[10px] text-slate-550 text-slate-500 font-bold block mb-1 uppercase tracking-wider font-mono">ID Expiry / Notes</label>
-                <input 
-                  placeholder="expiry, location etc..."
-                  value={idNotes}
-                  onChange={(e) => setIdNotes(e.target.value)}
-                  className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            <button 
-              type="submit"
-              className="w-full bg-gradient-to-r from-cyan-500 to-indigo-600 hover:opacity-95 active:scale-[0.98] font-bold text-white py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all text-xs cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" /> Save Identity Record
-            </button>
-          </form>
-
-          {/* List display */}
-          <div className="space-y-2">
-            <span className="text-[10px] font-bold text-slate-400 tracking-wider font-mono uppercase block">
-              SAVED IDENTITIES {searchQuery ? `(FILTERED: ${filteredPersonalIDs.length} MATCHES)` : `(${personalIDs.length})`}
-            </span>
-
-            <div className="space-y-2">
-              {filteredPersonalIDs.length === 0 ? (
-                <p className="text-xs text-slate-400 text-center py-6 bg-slate-50 border border-slate-150 rounded-2xl italic">No saved IDs found.</p>
-              ) : (
-                filteredPersonalIDs.map(pid => (
-                  <div key={pid.id} className="bg-white border border-slate-150 rounded-2xl p-4 space-y-3 shadow-sm hover:border-slate-350 transition-all font-sans relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-indigo-500/5 rounded-full blur-xl pointer-events-none" />
-                    
+          
+          {/* Active Search Mode override */}
+          {searchQuery ? (
+            <div className="space-y-3 text-left">
+              <span className={`text-[10px] font-bold tracking-wider font-mono uppercase block ${isCircadian ? "text-emerald-400" : "text-slate-400"}`}>
+                SEARCH MATCHES ({filteredPersonalIDs.length})
+              </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {filteredPersonalIDs.map(pid => (
+                  <div key={pid.id} className={`rounded-2xl p-4 space-y-3 shadow-sm hover:scale-[1.005] transition-all font-sans relative overflow-hidden ${isCircadian ? "bg-[#0b120f] border border-emerald-900/60" : "bg-white border border-slate-150"}`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100">
+                        <div className={`p-2 rounded-xl border ${isCircadian ? "bg-emerald-950/20 text-emerald-400 border-emerald-900/30" : "bg-indigo-50 text-indigo-600 border-indigo-100"}`}>
                           <CreditCard className="w-4 h-4" />
                         </div>
                         <div>
-                          <h4 className="font-bold text-slate-800 text-xs tracking-tight">{pid.idType}</h4>
-                          <span className="text-[9px] text-slate-450 block uppercase font-mono font-black tracking-wide mt-0.5">SECURE DOCUMENT PROFILE</span>
+                          <h4 className={`font-bold text-xs tracking-tight ${isCircadian ? "text-emerald-100" : "text-slate-800"}`}>{pid.idType}</h4>
+                          <span className={`text-[8.5px] block font-mono font-bold tracking-wider mt-0.5 ${isCircadian ? "text-emerald-500" : "text-slate-400"}`}>
+                            {pid.folderName ? `FOLDER: ${pid.folderName.toUpperCase()}` : "UNSORTED"}
+                          </span>
                         </div>
                       </div>
-
                       <button
                         onClick={() => deletePersonalID(pid.id)}
-                        className="p-1.5 rounded-lg border border-slate-150 text-slate-400 hover:text-rose-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                        className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${isCircadian ? "border-emerald-900/30 text-emerald-600 hover:text-rose-450 hover:bg-emerald-950/25" : "border-slate-150 text-slate-450 hover:text-rose-600 hover:bg-slate-50"}`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
 
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-150 text-[11px] space-y-2 text-slate-700">
+                    <div className={`p-3 rounded-xl border text-[11px] space-y-2 ${isCircadian ? "bg-emerald-950/10 border-emerald-900/20 text-emerald-200" : "bg-slate-50 border-slate-150 text-slate-750"}`}>
                       <div className="flex justify-between items-center py-0.5">
-                        <span className="text-[9px] uppercase font-bold text-slate-450 font-mono">Holder Name</span>
-                        <span className="font-bold text-slate-800 tracking-tight">{pid.nameOnID}</span>
+                        <span className={`text-[9px] uppercase font-bold font-mono ${isCircadian ? "text-emerald-500" : "text-slate-400"}`}>Holder Name</span>
+                        <span className={`font-bold tracking-tight ${isCircadian ? "text-emerald-105 text-emerald-100" : "text-slate-800"}`}>{pid.nameOnID}</span>
                       </div>
-                      <div className="flex justify-between items-center py-0.5 border-t border-dashed border-slate-200">
-                        <span className="text-[9px] uppercase font-bold text-slate-450 font-mono">Unique ID / Code</span>
+                      <div className={`flex justify-between items-center py-0.5 border-t border-dashed ${isCircadian ? "border-emerald-900/20" : "border-slate-200"}`}>
+                        <span className={`text-[9px] uppercase font-bold font-mono ${isCircadian ? "text-emerald-500" : "text-slate-400"}`}>Unique ID / Code</span>
                         <div className="flex items-center gap-1.5">
-                          <span className="font-mono font-bold text-indigo-600 tracking-wide select-text">{pid.idNumber}</span>
+                          <span className={`font-mono font-bold tracking-wide select-text ${isCircadian ? "text-emerald-400" : "text-indigo-600"}`}>{pid.idNumber}</span>
                           <button
                             onClick={() => {
                               navigator.clipboard.writeText(pid.idNumber);
                               setCopiedID(pid.id);
                               setTimeout(() => setCopiedID(null), 2000);
                             }}
-                            className="p-1 text-slate-400 hover:text-indigo-600 bg-white border border-slate-200 rounded-md transition-all cursor-pointer"
-                            title="Copy Card Number"
+                            className={`p-1 border rounded-md transition-all cursor-pointer ${isCircadian ? "bg-emerald-950/20 border-emerald-900/40 text-emerald-400 hover:text-emerald-200" : "bg-white border-slate-205 text-slate-400 hover:text-indigo-600"}`}
                           >
-                            {copiedID === pid.id ? (
-                              <Check className="w-2.5 h-2.5 text-emerald-600" />
-                            ) : (
-                              <Copy className="w-2.5 h-2.5" />
-                            )}
+                            {copiedID === pid.id ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
                           </button>
                         </div>
                       </div>
+                      {pid.notes && (
+                        <div className={`pt-1.5 border-t border-dashed ${isCircadian ? "border-emerald-900/20 text-emerald-400" : "border-slate-200 text-slate-500"} text-[10px]`}>
+                          <span className="font-bold">Notes:</span> {pid.notes}
+                        </div>
+                      )}
+                    </div>
+
+                    {pid.idPhoto && (
+                      <div className="mt-2 space-y-1 text-left">
+                        <span className={`text-[9px] uppercase font-bold font-mono block ${isCircadian ? "text-emerald-500" : "text-slate-405"}`}>Document Photo</span>
+                        <div 
+                          className="relative group overflow-hidden border rounded-xl max-w-[130px] aspect-[1.58/1] cursor-pointer shadow-sm border-slate-200"
+                          onClick={() => setFullViewPhoto(pid.idPhoto!)}
+                        >
+                          <img src={pid.idPhoto} alt="Personal ID" referrerPolicy="no-referrer" className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-200" />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[8px] text-white font-bold transition-opacity">
+                            View Photo Card
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* NORMAL FOLDER MODE */}
+              {selectedFolder === null ? (
+                <div className="space-y-4">
+                  {/* Create Persona Folder Card */}
+                  <div className={`rounded-2xl p-4 border shadow-sm text-left ${isCircadian ? "bg-[#0b120f] border-emerald-900/60" : "bg-slate-50 border-slate-150"}`}>
+                    <h3 className={`font-black text-xs uppercase flex items-center gap-1.5 ${isCircadian ? "text-emerald-400" : "text-slate-700"}`}>
+                      <FolderLock className="w-4 h-4 text-emerald-450 text-cyan-500" />
+                      Create New Folder / Persona Profile
+                    </h3>
+                    <p className={`text-[10px] mt-1 mb-3 font-semibold ${isCircadian ? "text-emerald-600" : "text-slate-450 text-slate-550"}`}>
+                      Organise cards under personal names (e.g. Akash, Wife, Dad, Kids) to keep IDs compartmentalised.
+                    </p>
+                    
+                    <div className="flex gap-2.5">
+                      <input 
+                        type="text"
+                        placeholder="Enter full name (e.g. Akash Chaudhary)"
+                        value={newFolderName}
+                        onChange={(e) => setNewFolderName(e.target.value)}
+                        className={`flex-1 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-bold ${
+                          isCircadian 
+                            ? "bg-[#070b09] border border-emerald-950 text-emerald-100 placeholder-emerald-900" 
+                            : "bg-white border border-slate-205 text-slate-800 placeholder-slate-400"
+                        }`}
+                      />
+                      <button 
+                        onClick={() => {
+                          if (newFolderName.trim()) {
+                            const trimmed = newFolderName.trim();
+                            if (!folders.includes(trimmed)) {
+                              setFolders(prev => [...prev, trimmed]);
+                            }
+                            setSelectedFolder(trimmed);
+                            setNewFolderName("");
+                          }
+                        }}
+                        className="bg-indigo-600 hover:bg-indigo-700 hover:opacity-95 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-xl flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Create Folder
+                      </button>
                     </div>
                   </div>
-                ))
+
+                  {/* Folders List Grid */}
+                  <div className="space-y-2 text-left">
+                    <span className={`text-[10px] font-mono font-bold tracking-widest uppercase block ${isCircadian ? "text-emerald-400" : "text-slate-450"}`}>
+                      Profile Folders ({folders.length})
+                    </span>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {folders.map(folder => {
+                        const count = personalIDs.filter(p => p.folderName === folder).length;
+                        return (
+                          <div 
+                            key={folder}
+                            onClick={() => setSelectedFolder(folder)}
+                            className={`p-4 rounded-2xl border flex items-center justify-between cursor-pointer group shadow-sm transition-all hover:scale-[1.01] ${
+                              isCircadian 
+                                ? "bg-[#0a0f0d] hover:bg-[#0c1612] border-emerald-950/40 hover:border-emerald-500/50" 
+                                : "bg-white hover:bg-slate-50/50 border-slate-150 hover:border-indigo-400/40"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3.5">
+                              <div className={`p-3 rounded-xl border ${
+                                isCircadian 
+                                  ? "bg-emerald-950/20 text-emerald-400 border-emerald-900/30" 
+                                  : "bg-indigo-50 text-indigo-600 border-indigo-100 group-hover:bg-indigo-105"
+                              }`}>
+                                <FolderLock className="w-5 h-5" />
+                              </div>
+                              <div className="text-left">
+                                <h4 className={`font-black text-xs ${isCircadian ? "text-emerald-100" : "text-slate-800"}`}>
+                                  {folder}
+                                </h4>
+                                <span className={`text-[9.5px] font-bold font-mono tracking-wider mt-0.5 block ${isCircadian ? "text-emerald-600" : "text-slate-450"}`}>
+                                  {count} SECURE CARD{count !== 1 ? "S" : ""} ATTACHED
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {count === 0 && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setFolders(prev => prev.filter(f => f !== folder));
+                                  }}
+                                  title="Delete empty folder"
+                                  className={`p-2 rounded-lg border transition-colors cursor-pointer ${
+                                    isCircadian 
+                                      ? "border-emerald-900/20 text-emerald-700 hover:text-rose-450 hover:bg-emerald-950/30" 
+                                      : "border-slate-150 text-slate-400 hover:text-rose-600 hover:bg-slate-50"
+                                  }`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <span className={`text-[10px] font-mono font-bold uppercase ${isCircadian ? "text-emerald-500" : "text-slate-400"}`}>
+                                Open &rarr;
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Unsorted / Loose IDs block (if any cards have no folderName set) */}
+                  {personalIDs.some(p => !p.folderName) && (
+                    <div className="pt-4 border-t border-dashed border-slate-200/50 space-y-2 text-left">
+                      <span className={`text-[10px] font-bold font-mono tracking-widest uppercase block ${isCircadian ? "text-emerald-400" : "text-slate-450"}`}>
+                        Loose / Uncategorised Documents
+                      </span>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {personalIDs.filter(p => !p.folderName).map(pid => (
+                          <div key={pid.id} className={`rounded-2xl p-4 space-y-3 shadow-sm hover:scale-[1.005] transition-all font-sans relative overflow-hidden ${isCircadian ? "bg-[#0b120f] border border-emerald-900/60" : "bg-white border border-slate-150"}`}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2.5">
+                                <div className={`p-2 rounded-xl border ${isCircadian ? "bg-emerald-950/20 text-emerald-400 border-emerald-900/30" : "bg-indigo-50 text-indigo-600 border-indigo-100"}`}>
+                                  <CreditCard className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <h4 className={`font-bold text-xs tracking-tight ${isCircadian ? "text-emerald-100" : "text-slate-800"}`}>{pid.idType}</h4>
+                                  <span className={`text-[8.5px] block font-mono font-bold tracking-wider mt-0.5 ${isCircadian ? "text-emerald-500" : "text-slate-400"}`}>UNCATEGORISED</span>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => deletePersonalID(pid.id)}
+                                className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${isCircadian ? "border-emerald-900/30 text-emerald-600 hover:text-rose-450 hover:bg-emerald-950/25" : "border-slate-150 text-slate-450 hover:text-rose-600 hover:bg-slate-50"}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            <div className={`p-3 rounded-xl border text-[11px] space-y-2 ${isCircadian ? "bg-emerald-950/10 border-emerald-900/20 text-emerald-200" : "bg-slate-50 border-slate-150 text-slate-750"}`}>
+                              <div className="flex justify-between items-center py-0.5">
+                                <span className={`text-[9px] uppercase font-bold font-mono ${isCircadian ? "text-emerald-500" : "text-slate-400"}`}>Holder Name</span>
+                                <span className={`font-bold tracking-tight ${isCircadian ? "text-emerald-105 text-emerald-100" : "text-slate-800"}`}>{pid.nameOnID}</span>
+                              </div>
+                              <div className={`flex justify-between items-center py-0.5 border-t border-dashed ${isCircadian ? "border-emerald-900/20" : "border-slate-200"}`}>
+                                <span className={`text-[9px] uppercase font-bold font-mono ${isCircadian ? "text-emerald-500" : "text-slate-400"}`}>Unique ID / Code</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`font-mono font-bold tracking-wide select-text ${isCircadian ? "text-emerald-400" : "text-indigo-600"}`}>{pid.idNumber}</span>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(pid.idNumber);
+                                      setCopiedID(pid.id);
+                                      setTimeout(() => setCopiedID(null), 2000);
+                                    }}
+                                    className={`p-1 border rounded-md transition-all cursor-pointer ${isCircadian ? "bg-emerald-950/20 border-emerald-900/40 text-emerald-400 hover:text-emerald-200" : "bg-white border-slate-205 text-slate-400 hover:text-indigo-600"}`}
+                                  >
+                                    {copiedID === pid.id ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                                  </button>
+                                </div>
+                              </div>
+                              {pid.notes && (
+                                <div className={`pt-1.5 border-t border-dashed ${isCircadian ? "border-emerald-900/20 text-emerald-450" : "border-slate-200 text-slate-500"} text-[10px]`}>
+                                  <span className="font-bold">Notes:</span> {pid.notes}
+                                </div>
+                              )}
+                            </div>
+
+                            {pid.idPhoto && (
+                              <div className="mt-2 text-left space-y-1">
+                                <span className={`text-[9px] uppercase font-bold font-mono block ${isCircadian ? "text-emerald-500" : "text-slate-405"}`}>Document Photo</span>
+                                <div 
+                                  className="relative group overflow-hidden border rounded-xl max-w-[130px] aspect-[1.58/1] cursor-pointer shadow-sm border-slate-200"
+                                  onClick={() => setFullViewPhoto(pid.idPhoto!)}
+                                >
+                                  <img src={pid.idPhoto} alt="Personal ID Image" referrerPolicy="no-referrer" className="w-full h-full object-cover" />
+                                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[8px] text-white font-bold transition-opacity">
+                                    Click to View
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* SELECTED INDIVIDUAL'S PROFILE FOLDER */
+                <div className="space-y-4 text-left">
+                  {/* Folder header navigation */}
+                  <div className="flex items-center justify-between bg-slate-50 dark:bg-[#0b120f] border border-slate-150 p-3 rounded-2xl">
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => {
+                          setSelectedFolder(null);
+                          setIsAddingID(false);
+                          setIdPhoto(null);
+                        }}
+                        className={`flex items-center justify-center p-2 rounded-xl border transition-colors text-xs font-bold gap-1 cursor-pointer ${
+                          isCircadian 
+                            ? "bg-[#070b09] border-emerald-902 border-emerald-900/40 text-emerald-400 hover:bg-emerald-950/20" 
+                            : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        &larr; Back to profiles
+                      </button>
+                      <div className="text-left ml-1">
+                        <span className={`text-[8.5px] font-mono font-bold tracking-widest block uppercase ${isCircadian ? "text-emerald-500" : "text-slate-400"}`}>
+                          ID VAULT CABINET FOLDER
+                        </span>
+                        <h4 className={`text-sm font-black leading-tight truncate max-w-[150px] ${isCircadian ? "text-white" : "text-slate-800"}`}>
+                          {selectedFolder}
+                        </h4>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setIsAddingID(prev => !prev)}
+                      className="bg-indigo-600 hover:bg-indigo-700 hover:opacity-95 active:scale-[0.98] font-bold text-white px-3.5 py-1.5 rounded-xl flex items-center justify-center gap-1.5 text-xs cursor-pointer transition-all"
+                    >
+                      {isAddingID ? "Cancel Adding" : "+ Register ID Card"}
+                    </button>
+                  </div>
+
+                  {/* Create ID card inside folder (collapsible component) */}
+                  {isAddingID && (
+                    <form onSubmit={handleAddCustomID} className={`border rounded-2xl p-4.5 space-y-4 shadow-sm text-sm text-[11.5px] translate-y-0 text-slate-800 ${isCircadian ? "bg-[#0b120f] border-emerald-900/60" : "bg-slate-50 border-slate-150"}`}>
+                      <h3 className={`font-black text-xs uppercase flex items-center gap-1.5 ${isCircadian ? "text-emerald-400" : "text-slate-705"}`}>
+                        <Plus className="w-4 h-4 text-cyan-500 text-emerald-400" />
+                        Add Card details under profile profile Code
+                      </h3>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className={`text-[10px] font-bold block mb-1 uppercase tracking-wider font-mono ${isCircadian ? "text-emerald-500" : "text-slate-500"}`}>ID / Document Type</label>
+                          <select 
+                            value={idType}
+                            onChange={(e) => setIdType(e.target.value)}
+                            className={`w-full rounded-xl px-2.5 py-2 font-bold ${
+                              isCircadian 
+                                ? "bg-[#070b09] border border-emerald-950 text-emerald-100" 
+                                : "bg-white border border-slate-200 text-slate-800"
+                            }`}
+                          >
+                            <option value="Aadhaar Card">Aadhaar Card</option>
+                            <option value="PAN Card">PAN Card</option>
+                            <option value="Passport">Passport</option>
+                            <option value="Driver License">Driving License</option>
+                            <option value="Voter ID">Voter ID</option>
+                            <option value="Custom">Custom Label</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className={`text-[10px] font-bold block mb-1 uppercase tracking-wider font-mono ${isCircadian ? "text-emerald-500" : "text-slate-500"}`}>Name on Document</label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g. Akash Chaudhary"
+                            value={nameOnID}
+                            onChange={(e) => setNameOnID(e.target.value)}
+                            required
+                            className={`w-full rounded-xl px-3 py-2 font-bold focus:outline-none focus:border-indigo-500 ${
+                              isCircadian 
+                                ? "bg-[#070b09] border border-emerald-950 text-emerald-105 text-emerald-100" 
+                                : "bg-white border border-slate-200 text-slate-800"
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      {idType === "Custom" && (
+                        <div className="animate-in slide-in-from-top-1.5 duration-150">
+                          <label className={`text-[10px] font-bold block mb-1 uppercase tracking-wider font-mono ${isCircadian ? "text-emerald-500" : "text-slate-500"}`}>Enter Custom ID Name</label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g. Employee ID, Gym Membership Code"
+                            value={customIdType}
+                            onChange={(e) => setCustomIdType(e.target.value)}
+                            required
+                            className={`w-full rounded-xl px-3 py-2 font-bold ${
+                              isCircadian 
+                                ? "bg-[#070b09] border border-emerald-950 text-emerald-100" 
+                                : "bg-white border border-slate-200 text-slate-800"
+                            }`}
+                          />
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <label className={`text-[10px] font-bold block mb-1 uppercase tracking-wider font-mono ${isCircadian ? "text-emerald-500" : "text-slate-500"}`}>ID / Card Number</label>
+                          <input 
+                            type="text" 
+                            placeholder="Document number..."
+                            value={idNumber}
+                            onChange={(e) => setIdNumber(e.target.value)}
+                            required
+                            className={`w-full rounded-xl px-3 py-2 font-bold focus:outline-none focus:border-indigo-500 ${
+                              isCircadian 
+                                ? "bg-[#070b09] border border-emerald-950 text-emerald-100" 
+                                : "bg-white border border-slate-205 text-slate-800"
+                            }`}
+                          />
+                        </div>
+
+                        <div>
+                          <label className={`text-[10px] font-bold block mb-1 uppercase tracking-wider font-mono ${isCircadian ? "text-emerald-500" : "text-slate-500"}`}>ID Expiry / Notes</label>
+                          <input 
+                            placeholder="expiry, location etc..."
+                            value={idNotes}
+                            onChange={(e) => setIdNotes(e.target.value)}
+                            className={`w-full rounded-xl px-3 py-2 font-bold focus:outline-none focus:border-indigo-500 ${
+                              isCircadian 
+                                ? "bg-[#070b09] border border-emerald-950 text-emerald-100" 
+                                : "bg-white border border-slate-205 text-slate-800"
+                            }`}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Photo Attachment upload box */}
+                      <div>
+                        <label className={`text-[10px] font-bold block mb-15 mb-1.5 uppercase tracking-wider font-mono ${isCircadian ? "text-emerald-500" : "text-slate-505 text-slate-500"}`}>
+                          ID Card Photo / Document Scan (unencrypted full view)
+                        </label>
+
+                        <input 
+                          type="file" 
+                          accept="image/*"
+                          ref={idPhotoInputRef}
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                setIdPhoto(reader.result as string);
+                              };
+                              reader.readAsDataURL(e.target.files[0]);
+                            }
+                          }}
+                          className="hidden"
+                        />
+
+                        {idPhoto ? (
+                          <div className={`relative border rounded-xl p-3 flex items-center gap-3.5 ${isCircadian ? "border-emerald-500 bg-emerald-950/10" : "border-emerald-250 border-emerald-300 bg-emerald-50/25"}`}>
+                            <div className="w-14 h-10 rounded-lg overflow-hidden border border-slate-150 bg-white">
+                              <img src={idPhoto} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            </div>
+                            <div className="flex-1 text-[11px] overflow-hidden">
+                              <span className={`block font-bold truncate ${isCircadian ? "text-emerald-200" : "text-slate-800"}`}>Scan Attachment Added</span>
+                              <span className="block font-mono text-[9px] text-slate-400">Ready to save under profile profile folder</span>
+                            </div>
+                            <button 
+                              type="button" 
+                              onClick={() => setIdPhoto(null)} 
+                              className={`p-1.5 rounded-lg border transition-all text-rose-500 hover:bg-slate-100 ${isCircadian ? "border-emerald-900/30 text-rose-400 hover:bg-emerald-950" : "border-slate-200 text-rose-650"}`}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <button 
+                            type="button" 
+                            onClick={() => idPhotoInputRef.current?.click()}
+                            className={`w-full border-2 border-dashed py-3.5 rounded-2xl flex items-center justify-center gap-1.5 text-xs text-slate-450 hover:bg-slate-50 cursor-pointer text-slate-500 transition-colors ${isCircadian ? "border-emerald-900/40 hover:border-emerald-500 hover:bg-emerald-950/10" : "border-slate-205 hover:border-indigo-400"}`}
+                          >
+                            <FileUp className="w-4 h-4 text-cyan-600" /> Upload Persona ID Photo
+                          </button>
+                        )}
+                      </div>
+
+                      <button 
+                        type="submit"
+                        className="w-full bg-gradient-to-r from-cyan-500 to-indigo-600 hover:opacity-95 active:scale-[0.98] font-bold text-white py-2.5 rounded-xl flex items-center justify-center gap-1.5 transition-all text-xs cursor-pointer shadow-md"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Save Identity Record under {selectedFolder}
+                      </button>
+                    </form>
+                  )}
+
+                  {/* ID List Display */}
+                  <div className="space-y-3">
+                    <span className={`text-[10px] font-bold tracking-wider font-mono uppercase block ${isCircadian ? "text-emerald-400" : "text-slate-400"}`}>
+                      CARDS STORED IN "{selectedFolder.toUpperCase()}"
+                    </span>
+
+                    {personalIDs.filter(p => p.folderName === selectedFolder).length === 0 ? (
+                      <div className={`p-8 rounded-2xl border text-center ${isCircadian ? "bg-[#0b120f]/60 border-emerald-900/20" : "bg-slate-50 border-slate-150"}`}>
+                        <CreditCard className="w-8 h-8 text-slate-350 mx-auto opacity-40 mb-2" />
+                        <p className={`text-xs italic ${isCircadian ? "text-emerald-700" : "text-slate-400"}`}>
+                          No card records registered inside this profile yet.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                        {personalIDs.filter(p => p.folderName === selectedFolder).map(pid => (
+                          <div key={pid.id} className={`rounded-2xl p-4 space-y-3.5 shadow-sm hover:scale-[1.005] transition-all font-sans relative overflow-hidden ${isCircadian ? "bg-[#0b120f] border border-emerald-900/60" : "bg-white border border-slate-150"}`}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2.5">
+                                <div className={`p-2 rounded-xl border ${isCircadian ? "bg-emerald-950/20 text-emerald-400 border-emerald-900/30" : "bg-indigo-50 text-indigo-600 border-indigo-100"}`}>
+                                  <CreditCard className="w-4 h-4" />
+                                </div>
+                                <div className="text-left">
+                                  <h4 className={`font-bold text-xs tracking-tight ${isCircadian ? "text-emerald-100" : "text-slate-800"}`}>{pid.idType}</h4>
+                                  <span className={`text-[8px] font-mono tracking-wider ${isCircadian ? "text-emerald-500" : "text-slate-400"}`}>CONNECTED IDENTIFICATION</span>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => deletePersonalID(pid.id)}
+                                className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${isCircadian ? "border-emerald-900/30 text-emerald-600 hover:text-rose-450 hover:bg-emerald-950/25" : "border-slate-150 text-slate-450 hover:text-rose-600 hover:bg-slate-50"}`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            <div className={`p-3 rounded-xl border text-[11px] space-y-20 space-y-2 text-left ${isCircadian ? "bg-emerald-950/15 border-emerald-900/20 text-emerald-200" : "bg-slate-50 border-slate-150 text-slate-755 text-slate-700"}`}>
+                              <div className="flex justify-between items-center py-0.5">
+                                <span className={`text-[9px] uppercase font-bold font-mono ${isCircadian ? "text-emerald-500" : "text-slate-400"}`}>Holder Name</span>
+                                <span className={`font-bold tracking-tight ${isCircadian ? "text-emerald-105 text-emerald-100" : "text-slate-800"}`}>{pid.nameOnID}</span>
+                              </div>
+                              <div className={`flex justify-between items-center py-0.5 border-t border-dashed ${isCircadian ? "border-emerald-900/20" : "border-slate-200"}`}>
+                                <span className={`text-[9px] uppercase font-bold font-mono ${isCircadian ? "text-emerald-500" : "text-slate-400"}`}>Unique ID / Code</span>
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`font-mono font-bold tracking-wide select-text ${isCircadian ? "text-emerald-400" : "text-indigo-600"}`}>{pid.idNumber}</span>
+                                  <button
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(pid.idNumber);
+                                      setCopiedID(pid.id);
+                                      setTimeout(() => setCopiedID(null), 2000);
+                                    }}
+                                    className={`p-1 border rounded-md transition-all cursor-pointer ${isCircadian ? "bg-emerald-950/20 border-emerald-900/40 text-emerald-400 hover:text-emerald-200" : "bg-white border-slate-205 text-slate-400 hover:text-indigo-600"}`}
+                                  >
+                                    {copiedID === pid.id ? <Check className="w-2.5 h-2.5 text-emerald-400" /> : <Copy className="w-2.5 h-2.5" />}
+                                  </button>
+                                </div>
+                              </div>
+                              {pid.notes && (
+                                <div className={`pt-1.5 border-t border-dashed ${isCircadian ? "border-emerald-900/20 text-emerald-400" : "border-slate-200 text-slate-500"} text-[10px]`}>
+                                  <span className="font-bold">Notes:</span> {pid.notes}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* ID Scan unencrypted photo view block */}
+                            {pid.idPhoto && (
+                              <div className="mt-2 text-left space-y-1.5">
+                                <span className={`text-[9px] uppercase font-bold font-mono block ${isCircadian ? "text-emerald-505 text-emerald-500" : "text-slate-405 text-slate-400"}`}>Document Photo</span>
+                                <div className="relative group overflow-hidden border border-slate-150 rounded-xl max-w-[170px] aspect-[1.58/1] cursor-pointer shadow-sm hover:border-indigo-400 transition-colors" onClick={() => setFullViewPhoto(pid.idPhoto!)}>
+                                  <img src={pid.idPhoto} alt="Personal ID Image" referrerPolicy="no-referrer" className="w-full h-full object-cover transition-transform group-hover:scale-[1.03] duration-200" />
+                                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[9px] text-white font-black tracking-wide transition-opacity">
+                                    Click to View ID Info
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
-            </div>
-          </div>
+            </>
+          )}
+
         </div>
       )}
 
@@ -925,7 +1340,7 @@ export const SafeTab: React.FC = () => {
                 {/* Simulated Scanned ID graphic */}
                 <div className="my-1 border-y border-white/10 py-1 flex gap-2.5 text-[9px] items-start text-left">
                   <div className="w-7 h-9 bg-slate-800 rounded border border-white/15 flex items-center justify-center text-white/50 text-[7px] font-mono select-none">
-                    ID
+                     ID
                   </div>
                   <div className="space-y-0.5 font-mono">
                     <div className="text-[6px] text-slate-400 uppercase">System Stamp</div>
@@ -986,6 +1401,29 @@ export const SafeTab: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {fullViewPhoto && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[60] flex flex-col items-center justify-center p-4">
+          <button 
+            onClick={() => setFullViewPhoto(null)} 
+            className="absolute top-4 right-4 p-2 bg-white/20 text-white hover:bg-white/30 rounded-full transition-all cursor-pointer z-[70]"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          
+          <div className="max-w-3xl w-full max-h-[85vh] flex items-center justify-center rounded-2xl overflow-hidden border border-white/10 bg-black/40 shadow-2xl relative">
+            <img 
+              src={fullViewPhoto} 
+              alt="Unencrypted Photo ID" 
+              referrerPolicy="no-referrer"
+              className="max-w-full max-h-[80vh] object-contain" 
+            />
+          </div>
+          <span className="text-xs font-bold text-white/80 mt-4 tracking-wider uppercase font-mono bg-black/45 px-3 py-1 rounded-full">
+            Personal Card Photo — Complete Unencrypted View
+          </span>
         </div>
       )}
     </div>
